@@ -1,0 +1,24 @@
+"","Total_Size","Hits","Sig_Hits","Mummichog_Pvals","GSEA_Pvals","Combined_Pvals"
+"Steroid hormone biosynthesis",77,30,11,0.00165,0.01176,0.00023
+"Primary bile acid biosynthesis",46,4,2,0.02959,0.05634,0.01233
+"Fatty acid biosynthesis",10,2,1,0.0184,0.1143,0.01507
+"Porphyrin and chlorophyll metabolism",27,7,2,0.1314,0.03704,0.03079
+"Drug metabolism - cytochrome P450",21,8,2,0.4592,0.03846,0.08895
+"Arachidonic acid metabolism",35,28,6,0.492,0.07407,0.1571
+"Glycerolipid metabolism",7,3,1,0.1144,0.3934,0.1845
+"Valine, leucine and isoleucine biosynthesis",8,5,2,0.4244,0.1071,0.186
+"Purine metabolism",66,17,1,0.8182,0.08333,0.2513
+"Tyrosine metabolism",42,13,2,0.332,0.2135,0.2585
+"Glycerophospholipid metabolism",13,3,1,0.3069,0.3562,0.3513
+"Aminoacyl-tRNA biosynthesis",22,17,4,0.2539,0.4444,0.359
+"Phenylalanine, tyrosine and tryptophan biosynthesis",4,3,1,0.3484,0.4722,0.4614
+"Phenylalanine metabolism",12,9,2,0.2407,0.8902,0.5443
+"Galactose metabolism",27,14,1,0.3484,0.7083,0.592
+"Pyrimidine metabolism",39,17,2,0.7927,0.4167,0.6962
+"Nitrogen metabolism",6,2,1,0.3484,0.9667,0.7033
+"Valine, leucine and isoleucine degradation",35,10,2,0.492,0.7143,0.7189
+"D-Glutamine and D-glutamate metabolism",6,6,2,0.5794,0.8571,0.8442
+"Alanine, aspartate and glutamate metabolism",28,13,1,0.748,0.6667,0.8456
+"Arginine biosynthesis",14,9,1,0.6738,0.7442,0.8476
+"Glyoxylate and dicarboxylate metabolism",31,6,1,0.5519,0.9398,0.8592
+"Tryptophan metabolism",41,18,2,0.8182,0.8333,0.943

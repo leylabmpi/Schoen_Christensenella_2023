@@ -1,0 +1,54 @@
+2023-11-05 20:14:31 INFO::Writing function arguments to log file
+2023-11-05 20:14:31 DEBUG::Function arguments
+2023-11-05 20:14:31 DEBUG::Output folder: ./data/Interim_output/SCFA_M
+2023-11-05 20:14:31 DEBUG::Min Abundance: 0.000000
+2023-11-05 20:14:31 DEBUG::Min Prevalence: 0.000000
+2023-11-05 20:14:31 DEBUG::Normalization: TSS
+2023-11-05 20:14:31 DEBUG::Transform: LOG
+2023-11-05 20:14:31 DEBUG::Analysis method: LM
+2023-11-05 20:14:31 DEBUG::Max significance: 0.100000
+2023-11-05 20:14:31 DEBUG::Random effects: Batch
+2023-11-05 20:14:31 DEBUG::Fixed effects: Category,Extraction_round
+2023-11-05 20:14:31 DEBUG::Correction method: BH
+2023-11-05 20:14:31 DEBUG::Standardize: TRUE
+2023-11-05 20:14:31 DEBUG::Cores: 1
+2023-11-05 20:14:31 INFO::Verifying options selected are valid
+2023-11-05 20:14:31 INFO::Determining format of input files
+2023-11-05 20:14:31 INFO::Input format is data samples as rows and metadata samples as rows
+2023-11-05 20:14:31 DEBUG::A total of 90 samples were found in both the data and metadata
+2023-11-05 20:14:31 DEBUG::Reordering data/metadata to use same sample ordering
+2023-11-05 20:14:31 INFO::Formula for random effects: expr ~ (1 | Batch)
+2023-11-05 20:14:31 INFO::Formula for fixed effects: expr ~  Category + Extraction_round
+2023-11-05 20:14:31 INFO::Filter data based on min abundance and min prevalence
+2023-11-05 20:14:31 INFO::Total samples in data: 90
+2023-11-05 20:14:31 INFO::Min samples required with min abundance for a feature not to be filtered: 0.000000
+2023-11-05 20:14:31 INFO::Total filtered features: 0
+2023-11-05 20:14:31 INFO::Filtered feature names from abundance and prevalence filtering:
+2023-11-05 20:14:31 INFO::Total filtered features with variance filtering: 0
+2023-11-05 20:14:31 INFO::Filtered feature names from variance filtering:
+2023-11-05 20:14:31 INFO::Running selected normalization method: TSS
+2023-11-05 20:14:31 INFO::Applying z-score to standardize continuous metadata
+2023-11-05 20:14:31 INFO::Running selected transform method: LOG
+2023-11-05 20:14:31 INFO::Running selected analysis method: LM
+2023-11-05 20:14:31 INFO::Fitting model to feature number 1, Acetate
+2023-11-05 20:14:31 INFO::Fitting model to feature number 2, Butyrate
+2023-11-05 20:14:31 INFO::Fitting model to feature number 3, Caproate
+2023-11-05 20:14:31 INFO::Fitting model to feature number 4, Propionate
+2023-11-05 20:14:32 INFO::Fitting model to feature number 5, Valerate
+2023-11-05 20:14:32 INFO::Counting total values for each feature
+2023-11-05 20:14:32 INFO::Writing filtered data to file ./data/Interim_output/SCFA_M/features/filtered_data.tsv
+2023-11-05 20:14:32 INFO::Writing filtered, normalized data to file ./data/Interim_output/SCFA_M/features/filtered_data_norm.tsv
+2023-11-05 20:14:32 INFO::Writing filtered, normalized, transformed data to file ./data/Interim_output/SCFA_M/features/filtered_data_norm_transformed.tsv
+2023-11-05 20:14:32 WARNING::Deleting existing residuals file: ./data/Interim_output/SCFA_M/fits/residuals.rds
+2023-11-05 20:14:32 INFO::Writing residuals to file ./data/Interim_output/SCFA_M/fits/residuals.rds
+2023-11-05 20:14:32 WARNING::Deleting existing fitted file: ./data/Interim_output/SCFA_M/fits/fitted.rds
+2023-11-05 20:14:32 INFO::Writing fitted values to file ./data/Interim_output/SCFA_M/fits/fitted.rds
+2023-11-05 20:14:32 WARNING::Deleting existing ranef file: ./data/Interim_output/SCFA_M/fits/ranef.rds
+2023-11-05 20:14:32 INFO::Writing extracted random effects to file ./data/Interim_output/SCFA_M/fits/ranef.rds
+2023-11-05 20:14:32 INFO::Writing all results to file (ordered by increasing q-values): ./data/Interim_output/SCFA_M/all_results.tsv
+2023-11-05 20:14:32 INFO::Writing the significant results (those which are less than or equal to the threshold of 0.100000 ) to file (ordered by increasing q-values): ./data/Interim_output/SCFA_M/significant_results.tsv
+2023-11-05 20:14:32 INFO::Writing heatmap of significant results to file: ./data/Interim_output/SCFA_M/heatmap.pdf
+2023-11-05 20:14:32 INFO::Writing association plots (one for each significant association) to output folder: ./data/Interim_output/SCFA_M
+2023-11-05 20:14:32 INFO::Plotting associations from most to least significant, grouped by metadata
+2023-11-05 20:14:32 INFO::Plotting data for metadata number 1, Category
+2023-11-05 20:14:32 INFO::Creating boxplot for categorical data, Category vs Butyrate

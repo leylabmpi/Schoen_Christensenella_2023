@@ -1,0 +1,3741 @@
+---
+title: "Schoen et al. 2023 - Code Analysis"
+output: html_notebook
+---
+# General
+
+In this notebook the code for the publication "Schoen et al. 2023, Christensenella minuta boosts gut microbial biomass and voluntary physical activity in mice" for all analyses is provided. 
+
+
+# Packages
+```{r}
+if (!require("data.table")) install_packages("data.table")
+library(data.table)
+if (!require("tidyverse")) install_packages("tidyverse")
+library(tidyverse)
+if (!require("ggplot2")) install_packages("ggplot2")
+library(ggplot2)
+if (!require("ggthemes")) install_packages("ggthemes")
+library(ggthemes)
+if (!require("scales")) install_packages("scales")
+library(scales)
+if (!require("ggforce")) install_packages("ggforce")
+library(ggforce)
+if (!require("ggpubr")) install_packages("ggpubr")
+library(ggpubr)
+if (!require('lubridate')) install_packages('lubridate')
+library(lubridate)
+if (!require('car')) install_packages('car')
+library(car)
+if (!require('Rmisc')) install_packages('Rmisc')
+library(Rmisc)
+if (!require('bestNormalize')) install_packages('bestNormalize')
+library(bestNormalize)
+if (!require('PerformanceAnalytics')) install_packages('PerformanceAnalytics')
+library(PerformanceAnalytics)
+if (!require('lmerTest')) install_packages('lmerTest')
+library(lmerTest)
+if (!require('reshape2')) install_packages('reshape2')
+library(reshape2)
+if (!require('emmeans')) install_packages('emmeans')
+library(emmeans)
+if (!require('Maaslin2')) install_packages('Maaslin2')
+library(Maaslin2)
+if (!require("effects")) install.packages("effects")
+library(effects)
+if (!require("vegan")) install.packages("vegan")
+library(vegan)
+if (!require("patchwork")) install.packages("patchwork")
+library(patchwork)
+if (!require("ggmap")) install_packages("ggmap")
+library(ggmap)
+if (!require("maps")) install_packages("maps")
+library(maps)
+if (!require("mapdata")) install_packages("mapdata")
+library(mapdata)
+if (!require("partR2")) remotes::install_github("mastoffel/partR2") 
+library(partR2)
+if (!require("rsq")) install_packages("rsq")
+library(rsq)
+if (!require("cowplot")) install_packages("cowplot")
+library(cowplot)
+if (!require("ggmap")) install_packages("ggmap")
+library(ggmap)
+if (!require("maps")) install_packages("maps")
+library(maps)
+if (!require("mapdata")) install_packages("mapdata")
+library(mapdata)
+if (!require("patchwork")) install_packages("patchwork")
+library(patchwork)
+if (!require("ggh4x")) install_packages("ggh4x")
+library(ggh4x)
+if (!require("ggbeeswarm")) install_packages("ggbeeswarm")
+library(ggbeeswarm)
+```
+# Functions
+```{r}
+backup_options <- options() #only run when restarting the session to save the default options
+options(backup_options)
+shape_Sex <- c(16, 4)
+color_Category <- c("darkgoldenrod1", "darkblue")
+color_HL <- c("sienna1", "deepskyblue")
+color_distict <- c("#000000","#004949","#009292","#ff6db6","#ffb6db",
+ "#490092","#006ddb","#b66dff","#6db6ff","#b6dbff",
+ "#920000","#924900","#db6d00","#24ff24","#ffff6d")
+
+properColnames=function(x){
+   gsub(" ", "_", 
+   gsub("-", "_", 
+   gsub(":", "_", 
+   gsub("\\+", "_", 
+   gsub("\\.", "_",
+   gsub("\\(", "", 
+   gsub("\\)", "", 
+   gsub("^\\d", "", names(x)))))))))
+}
+
+properNames = function(x){
+   gsub(" ", "_", 
+   gsub("-", "_", 
+   gsub(":", "_", 
+   gsub("\\+", "_",
+   gsub("\\.", "_", 
+   gsub("\\(", "", 
+   gsub("\\)", "", 
+   gsub("^\\d", "", x))))))))
+}
+```
+
+# Set working directory 
+```{r eval = FALSE}
+setwd(dir = "XXXX")
+```
+# Data
+```{r}
+# Christensenellacae global human studies
+Figure_globe_data <- fread("./data/FigureS1/map_data.txt") %>% dplyr::arrange(-Sample_size_of_cohort)
+
+# metadata including murine data, body composition measurements, weekly weight measurement, spilled food and feces in respirometry cages, bomb calorimetry mesurements, and qPCR mesurements
+metadata <- fread("./data/Metadata/Mouse_metadata.txt") 
+Metadata_exclude_id <- c(6296,6305,6374,6372, #sick
+                         6350,6426,6451, 6455) #died
+metadata <- metadata %>% dplyr::filter(!str_detect(MouseID, paste(Metadata_exclude_id, collapse="|")))
+#Promethion
+Promethion <- fread("./data/Promethion/Promethion_data_raw.txt")
+Circadian <- fread("./data/Promethion/Promethion_data_circadian.txt")
+
+# Metabolomics
+## LCMS
+### untargeted
+LCMS_xcms_output <- fread("./data/Metabolomics/LCMS_serum_untargeted_XCMS.diffreport.MultiClass.tsv")
+### targeted
+LCMS_serum <- fread("./data/Metabolomics/LCMS_trargeted_serum_area.csv") 
+## GC-MS: SCFA
+GCMS_SCFAs <- fread("./data/Metabolomics/GCMS_SCFAs.txt") 
+
+# Metagenomics
+## qPCR
+qPCR_data <- fread("./data/Metagenomics/qPCR_data.txt") 
+## Shotgun Sequencing
+Metagenomics_metadata_CC <- fread("./data/Metagenomics/Metagenomics_metadata_CC.txt") 
+
+Metagenomics_exclude_id <- c("6296", "6305", "6350", "6374", "6372", "6426", "6451", "6455" # sick anmals
+                                , "6434", "6420") #low DNA extraction yield --> low qPCR signal --> normalization not possible
+Bracken_otu_table_relFreq <- fread("./data/Metagenomics/Bracken_otu_table_relFreq.txt") # with Donor
+Bracken_otu_table_reads <- fread("./data/Metagenomics/Bracken_otu_table_reads.txt") # without Donor
+```
+
+# General modification of data
+## Promethion time series recordings
+```{r}
+start_date <- as.Date("2020-05-01") #defining common starting date for all recordings
+
+Promethion.2 <- Promethion %>%
+  dplyr::filter(!str_detect(MouseID, paste(Metadata_exclude_id, collapse="|"))) %>%
+  dplyr::mutate(Date = as.POSIXct(trunc(as.POSIXct(DateTime), units = "hours"))) %>%
+  dplyr::group_by(MouseID) %>%
+  dplyr::mutate(difference_start_date = round(as.numeric(difftime(as.Date(min(DateTime), format = "%Y%m%d"), start_date, units = "day"))), 
+                Date_common = Date - lubridate::days(difference_start_date)) %>% # create a date-column with a common starting date
+  dplyr::ungroup() %>%
+  dplyr::left_join(metadata, by = c("MouseID", "Batch", "Promethion_Position"))
+```
+
+## Promethion circadian recordings
+```{r}
+Circadian.2 <- Circadian %>%
+  dplyr::filter(!str_detect(MouseID, paste(Metadata_exclude_id, collapse="|"))) %>%
+  dplyr::mutate(StartDate = as.POSIXct(StartDate)) %>%
+  dplyr::group_by(MouseID) %>%
+  dplyr::mutate(difference_start_date = round(as.numeric(difftime(as.Date(min(StartDate), format = "%Y%m%d"), start_date, units = "day"))), 
+                StartDate_common = StartDate - lubridate::days(difference_start_date)) %>% # create a date-column with a common starting date
+  dplyr::ungroup() %>% 
+  dplyr::filter(StartDate_common != "2020-05-04", 
+                StartDate_common != "2020-05-01") # exclude acclimatization and take down
+```
+
+
+# Analysis
+Sorted by paragraphs of results
+## Figure S1 - Global map of studies associating the gut bacterial family Christensenellaceae with healthy body mass index and/or metabolic health in human gut microbiome studies. 
+```{r}
+FigureS1 <- ggplot() + 
+  geom_polygon(data = map_data('world'), 
+               aes(x=long, y = lat, group = group),
+               fill='gray20', color='white', size=0.1) +
+  geom_point(data=Figure_globe_data, aes(x=Long, y=Lat, size=Sample_size_of_cohort, fill = Association),
+            alpha=0.6, shape =21, color = "white") +
+  scale_fill_manual(values = c("#CC79A7", "#009E73")) +
+  coord_cartesian(xlim = c(-160, 180),
+                  ylim = c(-50, 80)) +
+  scale_size_continuous('Sample\nsize',
+                        range=c(1,12),
+                        breaks=c(100, 500, 2000, 5000)) +
+  labs(x='Longitude', y='Latitude') +
+  theme_classic(base_size = 10) +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill=alpha('lightsteelblue', 1))
+  ) +
+  guides(fill = guide_legend(override.aes = list(size = 4, alpha = 1)), size = guide_legend(override.aes = list(shape = 21, color = "black")))
+```
+```{r fig.width=6.5, fig.height= 3}
+FigureS1
+```
+```{r eval = FALSE}
+ggsave("./FigureS1.pdf", plot = FigureS1, device = cairo_pdf,  
+  width = 16.5,
+  height = 7.5,
+  units = "cm")
+```
+
+## Mice with live C. minuta show lower feed efficiency 
+### C. minuta abundance
+```{r}
+metadata_Cmin <- metadata %>% 
+  dplyr::filter(MouseID != 6434, MouseID != "6420", # too low DNA yield during DNA extraction --> technical issue
+                MouseID != 6477) %>%
+  dplyr::left_join(qPCR_data, by ="MouseID")# extreme outlier according to residuals -> excluded for normality reasons 
+
+Fig1_qPCR_Cmin<-metadata_Cmin %>% 
+  dplyr::mutate(Cmin_per_gCC_1e7 = qPCR_Cmin_per_gCC / 10000000)  %>% 
+  ggplot(aes(x = Category, y = Cmin_per_gCC_1e7, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = expression(paste("C. minuta (GE/g) x",e^7))) +
+  theme(axis.text.x = element_text(face = "italic")) 
+Fig1_qPCR_Cmin
+```
+```{r}
+set.seed(569)
+metadata_Cmin$qPCR_Cmin_per_gCC_norm <- predict(bestNormalize(metadata_Cmin$qPCR_Cmin_per_gCC))
+
+options(contrasts=c("contr.sum", "contr.poly"))
+model_Cmin<-lmer(qPCR_Cmin_per_gCC_norm ~ Category + qPCR_Round + (Category | Batch), data = metadata_Cmin)
+lmerTest::step(model_Cmin)
+```
+Testing model assumptions (normality and heteroscedasticity of residuals)
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_Cmin.2<-lmer(qPCR_Cmin_per_gCC_norm ~ Category + qPCR_Round + (Category | Batch), data = metadata_Cmin)
+
+shapiro.test(residuals(model_Cmin.2)) # test normality of residuals
+anova(lm(residuals(model_Cmin.2) ~ fitted(model_Cmin.2))) # test for heteroscedasticity 
+```
+
+```{r}
+plot(model_Cmin.2)
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+car::Anova(model_Cmin.2, type = "II", test.statistic ="F")
+```
+Calculation of means and SD with raw values
+```{r}
+model_Cmin.eff<-lmer(qPCR_Cmin_per_gCC ~ Category + qPCR_Round + (Category | Batch), data = metadata_Cmin)
+effects::effect("Category", model_Cmin.eff, se =TRUE) %>% as.data.frame()
+```
+examination of C. minuta in Donor sample
+```{r}
+Bracken_otu_table_relFreq %>% 
+  dplyr::select(-contains(Metagenomics_exclude_id), -taxonomy) %>% 
+  dplyr::filter(OTU_ID == "s__Christensenella minuta") %>%
+  dplyr::rename(rowname = OTU_ID) %>% 
+  tidyr::gather(var, value, -rowname) %>% 
+  tidyr::spread(rowname, value) %>% 
+  dplyr::rename(sampleid = var, s__Cmin_rel = "s__Christensenella minuta") %>% 
+  dplyr::left_join(Metagenomics_metadata_CC, by ="sampleid") %>%
+  dplyr::left_join(metadata, by ="MouseID") %>%
+  dplyr::mutate(Category = ifelse(grepl("Donor", sampleid), "Donor", Category)) %>% 
+  ggplot(aes(x = Category, y = s__Cmin_rel, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = c("black", color_Category), label = c("Donor","Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "relative C.minuta") +
+  theme(axis.text.x = element_text(face = "italic"))
+```
+### Murine weight and body composition
+#### Body weight
+```{r}
+metadata_weight <- metadata %>% 
+  dplyr::mutate(Category_Sex = paste(Category, Sex, sep="_")) %>%
+  dplyr::select(MouseID, Batch, Sex, Category, Category_Sex, Litter, T0_weight, T1_weight, T2_weight, T3_weight, Promethion_weight) %>%
+  dplyr::rename("7" = "T1_weight", "14" = "T2_weight", "21" = "T3_weight", "28" = "Promethion_weight") %>%
+  tidyr::gather(Day, weight, "7":"28")
+
+metadata_weight_withT0<- metadata %>%
+  dplyr::mutate(Category_Sex = paste(Category, Sex, sep="_")) %>%
+  dplyr::select(MouseID, Batch, Sex, Category, Category_Sex, Litter, T0_weight, T1_weight, T2_weight, T3_weight, Promethion_weight) %>%
+  dplyr::rename("0" = "T0_weight", "7" = "T1_weight", "14" = "T2_weight", "21" = "T3_weight", "28" = "Promethion_weight") %>%
+  tidyr::gather(Day, weight, "0":"28") %>%
+  dplyr::mutate(Day = as.numeric(Day))
+
+metadata_weight_withT0.2 <- na.omit(metadata_weight_withT0)
+
+metadata_weight_withT0_summary <- Rmisc::summarySE(metadata_weight_withT0.2, measurevar =  "weight",
+                            groupvar = c("Category", "Day", "Sex", "Category_Sex"), conf.interval = 0.95)
+
+FigS2_weight <- ggplot(metadata_weight_withT0_summary, aes(x=Day, y=weight, group=Category_Sex, color=Category)) + 
+  geom_line(alpha = 0.7) +
+  geom_errorbar(aes(ymin=weight-ci, ymax=weight+ci),
+                 position=position_dodge(0.05), alpha = 0.7, linetype = "dashed") +
+  geom_point(aes(shape = Sex), size = 3, alpha =1) +
+  scale_shape_manual(values=shape_Sex) +
+  labs(y = "Weight (g)", x = "Days") +
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  scale_x_continuous(breaks = c(0, 7, 14, 21, 25, 28)) +
+  theme_classic(base_size = 10) 
+FigS2_weight
+```
+statistical analysis
+```{r}
+set.seed(673)
+metadata_weight$weight_norm<- predict(bestNormalize(metadata_weight$weight))
+metadata_weight$T0_weight_norm<- predict(bestNormalize(metadata_weight$T0_weight))
+
+metadata_weight$Day_factor <- as.factor(metadata_weight$Day)
+metadata_weight$MouseID_factor <- as.factor(metadata_weight$MouseID)
+
+options(contrasts=c("contr.sum", "contr.poly"))
+model_weight<- lmerTest::lmer(weight_norm ~ Category*Sex*Day_factor + T0_weight_norm + (1|Batch/Sex) + (1|MouseID_factor/Batch/Sex), data = metadata_weight)
+lmerTest::step(model_weight, keep = "Category")
+```
+--> not significant for catgeoty or interactions of category wirth other variables
+--> no treatment effect on weight
+
+#### Adiposity gain
+```{r}
+metadata_gain <- metadata %>%
+  dplyr::mutate(T0_fatperc = T0_fatmass/T0_weight*100, 
+                T4_fatperc = T4_fatmass/T4_weight*100, 
+                adiposity_gain = T4_fatperc - T0_fatperc) %>%
+  dplyr::select(MouseID, Sex, Batch, Category, Litter, Promethion_Cabinet, T0_fatperc, T4_fatperc, T0_weight, adiposity_gain) 
+
+Fig1_adiposity <- metadata_gain %>% 
+  ggplot(aes(x = Category, y = adiposity_gain, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adiposity gain (%)") +
+  theme(axis.text.x = element_text(face = "italic"))  
+Fig1_adiposity
+```
+statistical analysis 
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_adiposity_gain <- lmerTest::lmer(adiposity_gain ~ Category*Sex + T0_fatperc*T0_weight +(1|Batch/Sex), data = metadata_gain)
+lmerTest::step(model_adiposity_gain, keep = "Category")
+```
+```{r}
+model_adiposity_gain.2 <- lm(adiposity_gain ~ Category+ T0_fatperc, data = metadata_gain)
+stats::shapiro.test(resid(model_adiposity_gain.2)) # test normality of residuals
+anova(lm(residuals(model_adiposity_gain.2)~fitted.values(model_adiposity_gain.2))) # test for heteroscedasticity 
+```
+```{r}
+plot(model_adiposity_gain.2)
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+car::Anova(model_adiposity_gain.2, test.statistic="F", type = "III")
+```
+-> no treatment effect
+
+
+
+
+### Food intake and feeding efficiency
+```{r}
+Promethion_Food <- Promethion.2 %>% 
+  dplyr::filter(MouseID != 6438, MouseID != 6450) %>% # spilled food into cage, as mouse was not eating from hopper
+  dplyr::filter(Date_common == as.POSIXct("2020-05-04 08:00:00")) %>% # filter endpoint data to obtain food eaten at the end of the experiment
+  tidyr::drop_na(Promethion_weight) %>%
+  dplyr::mutate(Food_corrected = FoodInA_M - Spilled_Food_cage, 
+                FI_kcal = Food_corrected*3.406557, 
+                FI_kcal_day = FI_kcal/70*24, 
+                FI_kcal_day_BW = FI_kcal_day/Promethion_weight) %>%
+  dplyr::group_by(Sex) %>% # exclude outliers, as spilled food might have measurement errors
+  dplyr::mutate(lower_bound_FI_kcal_day_BW = median(FI_kcal_day_BW) - 3.5 *mad(FI_kcal_day_BW), 
+                upper_bound_FI_kcal_day_BW = median(FI_kcal_day_BW) + 3.5 * mad(FI_kcal_day_BW)) %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(MouseID) %>%
+  dplyr::filter(dplyr::between(FI_kcal_day_BW, lower_bound_FI_kcal_day_BW, upper_bound_FI_kcal_day_BW)) %>% 
+  dplyr::ungroup() %>%
+  dplyr::mutate(Feed_eficiency = ((T6_weight - T0_weight)/28)/FI_kcal_day)
+```
+
+#### Food intake
+```{r}
+Fig1_foodintake_weight<- Promethion_Food %>%
+  ggplot(aes(x= Promethion_weight ,y=FI_kcal_day, color = Category, group = Category)) +
+  geom_smooth( method = "lm", se = F, alpha = 0.8, size = 0.5, show.legend = F)+ 
+  geom_point(aes(shape = Sex), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=c(16, 4), name = "Sex", label = c("Female", "Male")) + 
+  scale_color_manual(values=c(color_Category), label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  theme_classic(base_size = 10) +
+  labs(y = "Food intake (kcal/d)", x = "Weight (g)") 
+Fig1_foodintake_weight
+```
+Higher food intake  
+Statistical analysis:
+```{r}
+set.seed(628)
+Promethion_Food$FI_kcal_day_norm <- predict(bestNormalize(Promethion_Food$FI_kcal_day))
+Promethion_Food$Promethion_weight_norm <- predict(bestNormalize(Promethion_Food$Promethion_weight))
+
+options(contrasts=c("contr.sum", "contr.poly"))
+model_food <- lmerTest::lmer(FI_kcal_day_norm ~ Category*Sex + Sex*Promethion_weight_norm + (Category|Batch/Sex/Promethion_Cabinet), data = Promethion_Food)
+lmerTest::step(model_food, keep = "Category")
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_food.2 <- lm(FI_kcal_day_norm ~ Category+Sex+Promethion_weight_norm, data = Promethion_Food)
+stats::shapiro.test(residuals(model_food.2))
+anova(lm(residuals(model_food.2)~fitted.values(model_food.2)))
+```
+```{r}
+plot(model_food.2)
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+car::Anova(model_food.2, test.statistic="F", type = "II")
+```
+```{r}
+model_food_eff <- lm(FI_kcal_day ~ Category+Sex+Promethion_weight, data = Promethion_Food)
+effects::effect("Category", model_food_eff, se =TRUE) %>% as.data.frame()
+```
+```{r}
+(14.25670-13.59437)
+(14.25670-13.59437)/13.59437*100
+```
+```{r}
+model_food.residuals <- lm(FI_kcal_day_norm ~ Sex + Promethion_weight_norm, data = Promethion_Food)
+Promethion_Food$FI_kcal_day_residuals <- residuals(model_food.residuals)/sigma(model_food.residuals)
+
+Fig1_foodintake_resid <- Promethion_Food %>%
+  ggplot(aes(x = Category, y = FI_kcal_day_residuals, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. food intake") +
+  theme(axis.text.x = element_text(face = "italic")) 
+Fig1_foodintake_resid
+```
+
+#### Feed efficiency
+```{r}
+Fig1_feed_eff<- Promethion_Food %>%
+  ggplot(aes(x = Category, y = Feed_eficiency, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Feed efficicency (g/kcal)") +
+  theme(axis.text.x = element_text(face = "italic")) 
+Fig1_feed_eff
+```
+Lower feed efficiency 
+Statistical analysis: 
+```{r}
+set.seed(8765)
+Promethion_Food$Feed_eficiency_norm <- predict(bestNormalize(Promethion_Food$Feed_eficiency))
+
+options(contrasts=c("contr.sum", "contr.poly"))
+model_feed_eff <- lmer(Feed_eficiency_norm ~ Sex*Category + (Category |Batch/Sex/Promethion_Cabinet), data = Promethion_Food)
+step(model_feed_eff, keep = "Category")
+```
+```{r}
+model_feed_eff.2 <- lmer(Feed_eficiency_norm ~ Category  + (1 | Batch), data = Promethion_Food)
+stats::shapiro.test(residuals(model_feed_eff.2))
+anova(lm(residuals(model_feed_eff.2)~fitted.values(model_feed_eff.2)))
+```
+```{r}
+plot(model_feed_eff.2)
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+car::Anova(model_feed_eff.2, test.statistic="F", type = "II")
+```
+```{r}
+model_feed_eff_eff <- lmer(Feed_eficiency ~ Category  + (1 | Batch), data = Promethion_Food)
+effects::effect("Category", model_feed_eff_eff)
+```
+```{r}
+as.data.frame(effect("Category", model_feed_eff_eff, se = TRUE))
+```
+### Fecal energy loss
+```{r}
+metadata_bc <- metadata  %>%
+  dplyr::mutate(bombcal_Calorific_Value_kcal = bombcal_Calorific_Value/4184, # convert bombcal_Calorific_Value from J/g to kcal/g
+                bombcal_Calorific_Value_kcal_total = bombcal_Calorific_Value_kcal*bombcal_Dry_sample_mass,  # total energy content of 3 days in metabolic cages
+                bombcal_Calorific_Value_kcal_total_day = bombcal_Calorific_Value_kcal_total/70*24, # calculate daily energy excretion
+                bombcal_weight = bombcal_Calorific_Value_kcal_total_day / Promethion_weight) %>% # normalization by murine body weight for outlier detection
+  tidyr::drop_na(bombcal_weight) %>%
+  dplyr::group_by() %>%
+  dplyr::mutate(lower_bound_bombcal_weight= median(bombcal_weight, rm.na = TRUE) - 3 *mad(bombcal_weight),
+                upper_bound_bombcal_weight = median(bombcal_weight, rm.na = TRUE) + 3 * mad(bombcal_weight)) %>%
+  dplyr::group_by(MouseID) %>%
+  dplyr::filter(dplyr::between(bombcal_weight, lower_bound_bombcal_weight, upper_bound_bombcal_weight)) %>% # exclude outliers 
+  dplyr::ungroup() 
+```
+#### Fecal mass
+```{r}
+metadata_bc%>%
+  ggplot(aes(x = Category, y = bombcal_Dry_sample_mass, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  labs(y = "Fecal mass (g)") +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(face = "italic")) 
+```
+```{r}
+set.seed(628)
+
+metadata_bc$Promethion_weight_norm <- predict(bestNormalize(metadata_bc$Promethion_weight))
+metadata_bc$bombcal_Dry_sample_mass_norm <- predict(bestNormalize(metadata_bc$bombcal_Dry_sample_mass))
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_fecal_mass <- lmerTest::lmer(bombcal_Dry_sample_mass_norm ~ Category*Sex + Promethion_weight_norm +(Category|Batch/Sex/Promethion_Cabinet), data = metadata_bc)
+lmerTest::step(model_fecal_mass, keep = "Category")
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_fecal_mass.2 <- lmer(bombcal_Dry_sample_mass_norm ~ Category + Promethion_weight_norm + (1 | Promethion_Cabinet:(Sex:Batch)), data = metadata_bc)
+stats::shapiro.test(residuals(model_fecal_mass.2))
+anova(lm(residuals(model_fecal_mass.2)~fitted.values(model_fecal_mass.2)))
+```
+```{r}
+plot(model_fecal_mass.2)
+```
+```{r}
+car::Anova(model_fecal_mass.2, test.statistic="F", type = "II")
+```
+```{r}
+model_fecal_mass_resid <- lmer(bombcal_Dry_sample_mass_norm ~ Sex + Promethion_weight_norm+ (1 | Promethion_Cabinet:(Sex:Batch)), data = metadata_bc)
+
+metadata_bc$bombcal_Dry_sample_mass_resid <- residuals(model_fecal_mass_resid)/sigma(model_fecal_mass_resid)
+
+FigS2_fecal_mass <-  metadata_bc%>%
+  ggplot(aes(x = Category, y = bombcal_Dry_sample_mass_resid, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. fecal mass") +
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS2_fecal_mass
+```
+
+-> no difference between treatment groups
+
+#### Bomb calorimetry
+```{r}
+metadata_bc %>%
+  ggplot(aes(x= Promethion_weight ,y=bombcal_Calorific_Value_kcal_total_day, color = Category, group = Category)) +
+  geom_smooth( method = "lm", se = F, alpha = 0.8, size = 0.5, show.legend = F)+ 
+  geom_point(aes(shape = Sex), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=c(16, 4), name = "Sex", label = c("Female", "Male")) + 
+  scale_color_manual(values=c(color_Category), name = "Treatment", label = c("Killed-CM", "Live-CM")) +
+  theme_classic(base_size = 10) +
+  labs(y = "Fecal Energy (kcal/g/d)", x = "Weight (g)")
+```
+```{r}
+set.seed(628)
+
+metadata_bc$bombcal_Calorific_Value_kcal_total_day_norm <- predict(bestNormalize(metadata_bc$bombcal_Calorific_Value_kcal_total_day))
+
+options(contrasts=c("contr.sum", "contr.poly"))
+model_Bomb_cal <- lmerTest::lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ Category*Sex + Promethion_weight_norm +(Category|Batch/Sex/Promethion_Cabinet), data = metadata_bc)
+lmerTest::step(model_Bomb_cal, keep = "Category")
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_Bomb_cal.2 <- lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ Category + Promethion_weight_norm+ (1 | Promethion_Cabinet:(Sex:Batch)), data = metadata_bc)
+stats::shapiro.test(residuals(model_Bomb_cal.2))
+anova(lm(residuals(model_Bomb_cal.2)~fitted.values(model_Bomb_cal.2)))
+```
+```{r}
+plot(model_Bomb_cal.2)
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+car::Anova(model_Bomb_cal.2, test.statistic="F", type = "II")
+```
+```{r}
+model_Bomb_cal_resid <- lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ Sex + Promethion_weight_norm+ (1 | Promethion_Cabinet:(Sex:Batch)), data = metadata_bc)
+metadata_bc$bombcal_Calorific_Value_kcal_total_day_resid <- residuals(model_Bomb_cal_resid)/sigma(model_Bomb_cal_resid)
+
+Fig1_fecal_energy <- metadata_bc%>%
+  ggplot(aes(x = Category, y = bombcal_Calorific_Value_kcal_total_day_resid, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. fecal energy conetnt") +
+  theme(axis.text.x = element_text(face = "italic")) 
+Fig1_fecal_energy
+```
+-> no difference between treatment groups
+### Figure 1 - Effects of live or heat-killed C. minuta amendment to fecal transplants to GF mice on C. minuta, murine adiposity, feed efficiency and fecal energy loss four weeks post inoculation. 
+```{r}
+Legend_treatment_sex <- cowplot::get_legend(metadata_Cmin %>% 
+  dplyr::mutate(Sex = ifelse(Sex == "F", "Female", "Male"), 
+                Category = ifelse(Category == "Killed", "Killed-CM", "Live-CM"), 
+                Sex_Category = paste(Sex, Category, sep = " ")) %>%
+  ggplot(aes(x = Category, y = qPCR_Cmin_per_gCC, shape = Sex_Category, color = Sex_Category)) + 
+  geom_point(aes(shape = Sex_Category, color= Sex_Category), alpha =0.7, size =0.5, show.legend = T) +
+  scale_shape_manual(values=c(16, 16,4, 4)) + 
+  scale_color_manual(values=c(color_Category, color_Category)) +
+  theme_classic(base_size = 10) +
+  guides(shape = guide_legend(override.aes = list(size = 3, alpha = 1))) +
+  theme(legend.title=element_blank()))
+```
+```{r}
+Fig1_align <- cowplot::align_plots(Fig1_qPCR_Cmin + theme(legend.position="none"),
+                                   Fig1_adiposity + theme(legend.position="none"),  
+                                   Fig1_foodintake_weight + theme(legend.position="none"),
+                                   Fig1_foodintake_resid + theme(legend.position="none"),
+                                   Fig1_feed_eff + theme(legend.position="none"), 
+                                   Fig1_fecal_energy + theme(legend.position="none"),
+                                   align = 'hv', axis = 'tblr')
+                      
+Fig1_1 <- cowplot::plot_grid(Fig1_align[[1]], 
+                               Fig1_align[[2]],
+                               Fig1_align[[5]],
+                               Fig1_align[[6]],
+                               ncol=2, nrow=2, labels = c("B", "C", "F", "G"),label_size = 12, rel_widths = c(1,1), rel_heights = c(1,1))
+
+Fig1_2 <- cowplot::plot_grid(Fig1_align[[4]],
+                               Legend_treatment_sex,
+                               ncol=1, nrow=2, labels = c("E", NA),label_size = 12, rel_heights = c(1,1))
+
+Fig1_3 <- cowplot::plot_grid(Fig1_align[[3]],
+                               Fig1_2,
+                               ncol=2, nrow=1, labels = c("D", NA),label_size = 12, rel_widths = c(1,1))
+
+Figure1 <- cowplot::plot_grid(Fig1_1, 
+                             Fig1_3,
+                             ncol=2, nrow = 1, rel_widths = c(1,1))
+```
+```{r fig.width=6.5, fig.height= 4}
+Figure1
+```
+```{r eval = FALSE}
+ggsave("./Figure1.pdf", plot = Figure1, device = cairo_pdf,  
+  width = 17,
+  height = 10.5,
+  units = "cm")
+```
+### Figure S2 - Murine body weight gain and fecal mass.
+```{r}
+FigS2_align <- cowplot::align_plots(FigS2_weight + theme(legend.position="none"),
+                                   FigS2_fecal_mass + theme(legend.position="none"),
+                                   align = 'hv', axis = 'tblr')
+                      
+FigureS2 <- cowplot::plot_grid(FigS2_align[[1]], 
+                               FigS2_align[[2]],
+                               Legend_treatment_sex,
+                               ncol=3, nrow=1, labels = c("A", "B", NA),label_size = 12, rel_widths = c(1.5,1, 0.75))
+```
+```{r fig.width= 5, fig.height= 2.5}
+FigureS2
+```
+```{r eval = FALSE}
+ggsave("./FigureS2.pdf", plot = Fig_supp.fe, device = cairo_pdf,  
+  width = 13,
+  height = 6.5,
+  units = "cm")
+```
+
+## C. minuta amended mice displayed higher physical activity and metabolic energy expenditure in a sex-dependent manner
+### Activity 
+For the activity data the acclimatization period is removed, as activity is highly influenced by stress
+```{r}
+Promethion_activity_ee <- Promethion.2 %>% # create a common dataset to calculate EE and activity
+  base::subset(Date_common >= as.POSIXct('2020-05-02 08:00:00') & Date_common <= as.POSIXct('2020-05-04 08:00:00')) %>% # exclude acclimatization period and end of experiment 
+  dplyr::mutate(PedSpeed_Mnz = ifelse(PedSpeed_Mnz > 0, PedSpeed_Mnz, NA)) %>% # exclude speed when animals where not running
+  dplyr::group_by(MouseID) %>%
+  dplyr::summarise(Distance_traveled = sum(AllMeters_R), 
+                   Beam_breaks = sum(XBreak_R) + sum(YBreak_R) + sum(ZBreak_R), 
+                   mean_running_speed = mean(PedSpeed_Mnz, na.rm=TRUE),
+                   EE_average_per_hour = mean(kcal_hr_M)) %>%
+  dplyr::ungroup() %>%
+  dplyr::left_join(metadata, by ="MouseID") 
+
+Promethion_activity <- Promethion_activity_ee %>% # exclude mice with suspicious activity measurements 
+  dplyr::group_by(Batch) %>% 
+  dplyr::mutate(lower_bound_Distance_traveled = median(Distance_traveled) - 3 * mad(Distance_traveled),
+                upper_bound_Distance_traveled = median(Distance_traveled) + 3 * mad(Distance_traveled),
+                lower_bound_Beam_breaks = median(Beam_breaks) - 3 * mad(Beam_breaks), 
+                upper_bound_Beam_breaks = median(Beam_breaks) + 3 * mad(Beam_breaks)) %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(MouseID) %>% 
+  dplyr::filter(dplyr::between(Distance_traveled, lower_bound_Distance_traveled, upper_bound_Distance_traveled) | 
+                dplyr::between(Beam_breaks, lower_bound_Beam_breaks, upper_bound_Beam_breaks)) %>%
+  dplyr::ungroup() 
+```
+
+### Beam breaks
+```{r}
+Promethion_activity %>%
+  ggplot(aes(x = Category, y = Beam_breaks, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "# Beam breaks") +
+  theme(axis.text.x = element_text(face = "italic")) 
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_Beam_breaks<-(lmer(Beam_breaks ~ Category*Sex + (Category|Batch/Sex/Promethion_Cabinet), Promethion_activity))
+step(model_Beam_breaks, keep ="Category")
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_Beam_breaks.2<-(lmerTest::lmer(Beam_breaks ~ Category + Sex  + (1 | Batch), Promethion_activity))
+stats::shapiro.test(resid(model_Beam_breaks.2))
+anova(lm(residuals(model_Beam_breaks.2)~fitted.values(model_Beam_breaks.2)))
+```
+```{r}
+plot(model_Beam_breaks.2)
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+car::Anova(model_Beam_breaks.2, type="II", test.statistic="F")
+```
+```{r}
+effects::effect("Category", model_Beam_breaks.2, se =TRUE) %>% as.data.frame()
+```
+```{r}
+(119692.2-112072.3)/112072.3*100
+```
+```{r}
+model_Beam_breaks.residuals <-(lmerTest::lmer(Beam_breaks ~ Sex + (1 | Batch), Promethion_activity))
+Promethion_activity$Beam_breaks_residuals <- residuals(model_Beam_breaks.residuals)/sigma(model_Beam_breaks.residuals)
+
+Fig2_beam_breaks <- Promethion_activity %>% 
+  ggplot(aes(x = Category, y = Beam_breaks_residuals, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. beam breaks") +
+  theme(axis.text.x = element_text(face = "italic")) 
+Fig2_beam_breaks
+```
+-> significant more beam breaks by treatment
+
+### Distance traveled
+```{r}
+Promethion_activity %>%
+  ggplot(aes(x = Category, y = Distance_traveled, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Distance traveled (m)") +
+  theme(axis.title.x=element_blank()) +
+  theme(axis.text.x = element_text(face = "italic")) +
+  facet_grid(Sex~.) +
+     theme(strip.background = element_blank(),
+        strip.text = element_blank())  +
+  theme(axis.text.x = element_text(face = "italic")) 
+```
+```{r}
+set.seed(312) 
+Promethion_activity$Distance_traveled_norm<- predict(bestNormalize(Promethion_activity$Distance_traveled))
+
+model_Distance_traveled<-(lmer(Distance_traveled_norm ~ Category*Sex + (Category |Batch/Sex/Promethion_Cabinet), Promethion_activity))
+lmerTest::step(model_Distance_traveled, keep ="Category")
+```
+--> although not statistically significant, exact analysis of data results in assumption of different treatment effects in males and females 
+--> separate statistical analysis
+
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+Promethion_activity_M <- Promethion_activity %>% dplyr::filter(Sex =="M")
+Promethion_activity_F <- Promethion_activity %>% dplyr::filter(Sex =="F")
+
+model_Distance_traveled.m<-(lmerTest::lmer(Distance_traveled_norm ~ Category + (1 | Batch), Promethion_activity_M))
+stats::shapiro.test(resid(model_Distance_traveled.m))
+anova(lm(residuals(model_Distance_traveled.m)~fitted.values(model_Distance_traveled.m)))
+
+model_Distance_traveled.f<-(lmerTest::lmer(Distance_traveled_norm ~ Category + (1 | Batch), Promethion_activity_F))
+stats::shapiro.test(resid(model_Distance_traveled.f))
+anova(lm(residuals(model_Distance_traveled.f)~fitted.values(model_Distance_traveled.f)))
+```
+```{r}
+car::Anova(model_Distance_traveled.m, test.statistic ="F", type="II")
+car::Anova(model_Distance_traveled.f, test.statistic ="F", type="II")
+
+model_Distance_traveled.meff<-(lmerTest::lmer(Distance_traveled ~ Category + (1 | Batch), Promethion_activity_M))
+effects::effect("Category", model_Distance_traveled.meff, se =TRUE) %>% as.data.frame
+
+model_Distance_traveled.feff<-(lmerTest::lmer(Distance_traveled ~ Category + (1 | Batch), Promethion_activity_F))
+effects::effect("Category", model_Distance_traveled.feff, se =TRUE) %>% as.data.frame
+```
+```{r}
+model_Distance_traveled.m_residuals <-(lmerTest::lmer(Distance_traveled_norm ~ (1 | Batch), Promethion_activity_M))
+model_Distance_traveled.f_residuals <-(lmerTest::lmer(Distance_traveled_norm ~ (1 | Batch), Promethion_activity_F))
+
+Promethion_activity_M$Distance_traveled_residuals <- residuals(model_Distance_traveled.m_residuals)/sigma(model_Distance_traveled.m_residuals)
+Promethion_activity_F$Distance_traveled_residuals <- residuals(model_Distance_traveled.f_residuals)/sigma(model_Distance_traveled.f_residuals)
+
+Promethion_activity_MF<- rbind(Promethion_activity_M, Promethion_activity_F) 
+
+Fig2_distance <- Promethion_activity_MF%>% 
+  ggplot(aes(x = Category, y = Distance_traveled_residuals, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. distance traveled", x= "Treatment") +
+  theme(axis.title.x=element_blank()) +
+  theme(axis.text.x = element_text(face = "italic")) +
+  facet_grid(Sex~.) +
+     theme(strip.background = element_blank(),
+        strip.text = element_blank())  +
+  theme(axis.text.x = element_text(face = "italic"))
+Fig2_distance
+```
+### Mean running speed
+```{r}
+FigS3_speed <- Promethion_activity %>% 
+  ggplot(aes(x = Category, y = mean_running_speed, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y ="Mean running speed (m/s)") +
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS3_speed
+```
+```{r}
+set.seed(874)
+
+Promethion_activity <- Promethion_activity %>%
+  dplyr::mutate(mean_running_speed_norm = predict(bestNormalize(mean_running_speed)))
+
+
+model_speed <- lmer(mean_running_speed_norm ~ Category*Sex + Promethion_Cabinet + (1|Batch), data = Promethion_activity)
+step(model_speed)
+```
+```{r}
+model_speed.2 <- lmer(mean_running_speed_norm ~ Category + Sex + (1|Batch), data = Promethion_activity)
+shapiro.test(residuals(model_speed.2))
+anova(lm(residuals(model_speed.2)~fitted.values(model_speed.2)))
+```
+```{r}
+plot(model_speed.2)
+```
+```{r}
+car::Anova(model_speed.2, test.statistic ="F", type ="II")
+```
+```{r}
+model_speed.eff <- lmer(mean_running_speed ~ Category + Sex + (1|Batch), data = Promethion_activity)
+effects::effect("Category", model_speed.eff, se =TRUE) %>% as.data.frame()
+```
+### correlation of activity to C. minuta abundance
+```{r}
+Promethion_activity_MF_Cmin<- Promethion_activity_MF %>% 
+  dplyr::left_join(qPCR_data, by ="MouseID")
+
+Promethion_activity_MF_Cmin %>%
+  ggplot(aes(x= qPCR_Cmin_per_gCC ,y=Beam_breaks_residuals)) +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color = "black")+ 
+  geom_point(aes(shape = Sex, color = Category), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  theme_classic(base_size = 10) +
+  labs(y= "Adj. beam breaks",
+       x = "Norm. C. minuta") 
+
+
+Promethion_activity_MF_Cmin %>%
+  ggplot(aes(x= qPCR_Cmin_per_gCC ,y=Distance_traveled_residuals)) +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color = "black")+ 
+  geom_point(aes(shape = Sex, color = Category), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  theme_classic(base_size = 10) +
+  labs(y= "Adj. distance traveled", 
+       x = "Norm. C. minuta") +
+   theme(strip.background = element_blank(),
+        strip.text = element_blank()) +
+  facet_wrap(.~Sex, scales = "free", ncol =1) 
+```
+```{r}
+set.seed(710)
+
+Promethion_activity_MF_Cmin.2 <- Promethion_activity_MF_Cmin %>%
+  tidyr::drop_na(qPCR_Cmin_per_gCC) %>%
+  dplyr::mutate(qPCR_Cmin_per_gCC_norm = predict(bestNormalize(qPCR_Cmin_per_gCC)))
+
+model_bb_cmin<-(lmer(Beam_breaks ~ qPCR_Cmin_per_gCC_norm*Sex + qPCR_Round + (1 |Batch/Sex/Promethion_Cabinet) + (1 |Batch:Promethion_Cabinet) + (1 |Promethion_Cabinet), Promethion_activity_MF_Cmin.2))
+lmerTest::step(model_bb_cmin)
+
+model_distance_cmin<-(lmer(Distance_traveled ~ qPCR_Cmin_per_gCC_norm*Sex + qPCR_Round + (1 |Batch/Sex/Promethion_Cabinet) + (1 |Batch:Promethion_Cabinet) + (1 |Promethion_Cabinet), Promethion_activity_MF_Cmin.2))
+lmerTest::step(model_distance_cmin)
+```
+-> association between beam breaks and C. minuta for both sexes
+-> for distance traveled there might be only an association in males --> separate analysis
+#### Beam breaks ~ C. minuta 
+```{r}
+model_bb_cmin.2<-(lmer(Beam_breaks ~ qPCR_Cmin_per_gCC_norm + Sex + (1 | Batch), Promethion_activity_MF_Cmin.2))
+shapiro.test(residuals(model_bb_cmin.2))
+anova(lm(residuals(model_bb_cmin.2)~fitted.values(model_bb_cmin.2)))
+```
+```{r}
+car::Anova(model_bb_cmin.2, type ="II", test.statistic="F")
+```
+```{r}
+set.seed(765)
+r2_model_bb_cmin_mar<- partR2(model_bb_cmin.2, partvars = c("qPCR_Cmin_per_gCC_norm"), 
+                  R2_type = "marginal", nboot = 10)
+r2_model_bb_cmin_mar$R2 %>% dplyr::filter(term == "qPCR_Cmin_per_gCC_norm") %>% dplyr::select(estimate) %>% pull()
+
+model_bb_cmin.resid<-(lmer(Beam_breaks ~ Sex + (1 | Batch), Promethion_activity_MF_Cmin.2))
+
+Promethion_activity_MF_Cmin.2 <- Promethion_activity_MF_Cmin.2 %>% 
+  dplyr::mutate(Beam_breaks_cmin_resid = residuals(model_bb_cmin.resid)/sigma(model_bb_cmin.resid))
+
+Fig2_bb_cmin <- Promethion_activity_MF_Cmin.2 %>%
+  ggplot(aes(x= qPCR_Cmin_per_gCC_norm ,y=Beam_breaks_cmin_resid)) +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color = "black")+ 
+  geom_point(aes(shape = Sex, color = Category), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  theme_classic(base_size = 10) +
+  labs(y= "Adj. beam breaks",
+       x = "Norm. C. minuta")
+Fig2_bb_cmin
+```
+#### Distance traveled ~ C. minuta 
+```{r}
+Promethion_activity_M2 <- Promethion_activity_MF_Cmin.2 %>%
+  dplyr::filter(Sex =="M") %>%
+  dplyr::mutate( Batch_Promethion_Cabinet = paste( Batch, Promethion_Cabinet, sep ="_"))
+Promethion_activity_F2 <- Promethion_activity_MF_Cmin.2 %>%
+  dplyr::filter(Sex =="F")%>%
+  dplyr::mutate( Batch_Promethion_Cabinet = paste( Batch, Promethion_Cabinet, sep ="_"))
+
+model_distance_cmin_m<- lmer(Distance_traveled_norm ~ qPCR_Cmin_per_gCC_norm + (1 | Batch_Promethion_Cabinet), Promethion_activity_M2)
+model_distance_cmin_f<- lmer(Distance_traveled_norm ~ qPCR_Cmin_per_gCC_norm + (1 | Batch_Promethion_Cabinet), Promethion_activity_F2)
+
+shapiro.test(residuals(model_distance_cmin_m))
+anova(lm(residuals(model_distance_cmin_m)~fitted.values(model_distance_cmin_m)))
+
+shapiro.test(residuals(model_distance_cmin_f))
+anova(lm(residuals(model_distance_cmin_f)~fitted.values(model_distance_cmin_f)))
+```
+```{r}
+plot(model_distance_cmin_m)
+plot(model_distance_cmin_f)
+```
+```{r}
+car::Anova(model_distance_cmin_m, test.statistic ="F")
+car::Anova(model_distance_cmin_f, test.statistic ="F")
+```
+
+```{r}
+#r2 males
+r2_model_distance_cmin_m_mar<- partR2(model_distance_cmin_m, partvars = c("qPCR_Cmin_per_gCC_norm"), 
+                  R2_type = "marginal", nboot = 10)
+r2_model_distance_cmin_m_mar$R2 %>% dplyr::filter(term == "qPCR_Cmin_per_gCC_norm") %>% dplyr::select(estimate) %>% pull()
+#r2 females
+r2_model_distance_cmin_f_mar<- partR2(model_distance_cmin_f, partvars = c("qPCR_Cmin_per_gCC_norm"), 
+                  R2_type = "marginal", nboot = 10)
+r2_model_distance_cmin_f_mar$R2 %>% dplyr::filter(term == "qPCR_Cmin_per_gCC_norm") %>% dplyr::select(estimate) %>% pull()
+
+model_distance_cmin.resid_M<-(lmer(Distance_traveled_norm ~ + (1 | Batch:Promethion_Cabinet), Promethion_activity_M2))
+model_distance_cmin.resid_F<-(lmer(Distance_traveled_norm ~ + (1 | Batch:Promethion_Cabinet), Promethion_activity_F2))
+
+Promethion_activity_M2 <- Promethion_activity_M2 %>% 
+  dplyr::mutate(Distance_traveled_cmin_resid = residuals(model_distance_cmin.resid_M)/sigma(model_distance_cmin.resid_M))
+Promethion_activity_F2 <- Promethion_activity_F2 %>% 
+  dplyr::mutate(Distance_traveled_cmin_resid = residuals(model_distance_cmin.resid_F)/sigma(model_distance_cmin.resid_F))
+
+Promethion_activity_MF3 <- rbind(Promethion_activity_M2, Promethion_activity_F2)
+
+
+Fig2_distance_cmin<- Promethion_activity_MF3 %>%
+  ggplot(aes(x= qPCR_Cmin_per_gCC_norm ,y=Distance_traveled_cmin_resid)) +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color = "black")+ 
+  geom_point(aes(shape = Sex, color = Category), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  theme_classic(base_size = 10) +
+  labs(y= "Adj. distance traveled", 
+       x = "Norm. C. minuta") +
+   theme(strip.background = element_blank(),
+        strip.text = element_blank()) +
+  facet_wrap(.~Sex, scales = "free", ncol =1) 
+Fig2_distance_cmin
+```
+### Correlate activity to feed efficiency 
+```{r}
+Promethion_activity_food <- Promethion_Food %>%
+  dplyr::select(MouseID, Feed_eficiency) %>%
+  dplyr::left_join(Promethion_activity, by = "MouseID") %>%
+  tidyr::drop_na(Feed_eficiency, Beam_breaks)
+
+Promethion_activity_food %>%
+  ggplot(aes(x= Beam_breaks ,y=Feed_eficiency)) +
+  geom_smooth(method = "lm", se = F, alpha = 0.8, size = 0.5)+ 
+  geom_point(aes(shape = Sex, color = Category), alpha =0.7, size =0.5, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  theme_classic(base_size = 10) 
+
+Promethion_activity_food %>%
+  ggplot(aes(x= Distance_traveled ,y=Feed_eficiency)) +
+  geom_smooth(method = "lm", se = F, alpha = 0.8, size = 0.5)+ 
+  geom_point(aes(shape = Sex, color = Category), alpha =0.7, size =0.5, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  theme_classic(base_size = 10) +
+  facet_grid(.~Sex)
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+
+model_fe_bb <- lmer(Feed_eficiency~ Beam_breaks*Sex + (1|Batch), Promethion_activity_food)
+step(model_fe_bb)
+
+model_fe_distance <- lmer(Feed_eficiency~ Distance_traveled*Sex + (1|Batch), Promethion_activity_food)
+step(model_fe_distance)
+```
+```{r}
+set.seed(673)
+Promethion_activity_food$Feed_eficiency_norm <- predict(bestNormalize(Promethion_activity_food$Feed_eficiency))
+
+model_fe_bb.2 <- lmer(Feed_eficiency_norm~ Beam_breaks + (1|Batch), Promethion_activity_food)
+shapiro.test(residuals(model_fe_bb.2))
+anova(lm(residuals(model_fe_bb.2)~fitted.values(model_fe_bb.2)))
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+car::Anova(model_fe_bb.2, type ="II", test.statistic ="F")
+```
+
+```{r}
+r2_model_fe_bb_mar<- partR2(model_fe_bb.2, partvars = c("Beam_breaks"), 
+                  R2_type = "marginal", nboot = 10)
+r2_model_fe_bb_mar$R2 %>% dplyr::filter(term == "Beam_breaks") %>% dplyr::select(estimate) %>% pull()
+
+
+model_fe_bb_resid <- lmer(Feed_eficiency_norm~ (1|Batch), Promethion_activity_food)
+
+Promethion_activity_food <- Promethion_activity_food %>%
+  dplyr::mutate(Feed_eficiency_bb_resid = residuals(model_fe_bb_resid)/sigma(model_fe_bb_resid))
+
+Fig2_bb_fe <- Promethion_activity_food %>%
+  ggplot(aes(x= (Beam_breaks/100000) ,y=Feed_eficiency_bb_resid))+
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color = "black")+ 
+  geom_point(aes(color= Category, shape = Sex), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  labs(y="Adj. feed efficiency", x=expression(paste("Beam breaks (Nr) x ",e^5))) +
+  theme_classic(base_size = 10) +
+   theme(strip.background = element_blank(),
+        strip.text = element_blank()) 
+Fig2_bb_fe
+```
+Seperate models for each sex for Fe ~ distance
+```{r}
+set.seed(673)
+Promethion_activity_food_M <- Promethion_activity_food %>%
+  dplyr::filter(Sex =="M")  %>%
+  dplyr::mutate(Feed_eficiency_norm = predict(bestNormalize(Feed_eficiency)))
+
+Promethion_activity_food_F <- Promethion_activity_food  %>%
+  dplyr::filter(Sex =="F")  %>%
+  dplyr::mutate(Feed_eficiency_norm = predict(bestNormalize(Feed_eficiency)))
+
+model_fe_distance_m <- lmer(Feed_eficiency_norm~ Distance_traveled + (1|Batch), Promethion_activity_food_M)
+model_fe_distance_f <- lmer(Feed_eficiency_norm~ Distance_traveled + (1|Batch), Promethion_activity_food_F)
+
+shapiro.test(residuals(model_fe_distance_m))
+shapiro.test(residuals(model_fe_distance_f))
+
+anova(lm(residuals(model_fe_distance_m)~fitted.values(model_fe_distance_m)))
+anova(lm(residuals(model_fe_distance_f)~fitted.values(model_fe_distance_f)))
+```
+```{r}
+car::Anova(model_fe_distance_m, test.statistic ="F", type ="II")
+car::Anova(model_fe_distance_f, test.statistic ="F", type ="II")
+```
+
+```{r}
+#r2 males
+r2_model_fe_distance_m_mar<- partR2(model_fe_distance_m, partvars = c("Distance_traveled"), 
+                  R2_type = "marginal", nboot = 10)
+r2_model_fe_distance_m_mar$R2 %>% dplyr::filter(term == "Distance_traveled") %>% dplyr::select(estimate) %>% pull()
+
+#r2 females
+r2_model_fe_distance_f_mar<- partR2(model_fe_distance_f, partvars = c("Distance_traveled"), 
+                  R2_type = "marginal", nboot = 10)
+r2_model_fe_distance_f_mar$R2 %>% dplyr::filter(term == "Distance_traveled") %>% dplyr::select(estimate) %>% pull()
+
+model_fe_allm_m_resid <- lmer(Feed_eficiency_norm~  (1|Batch), Promethion_activity_food_M)
+model_fe_allm_f_resid <- lmer(Feed_eficiency_norm~  (1|Batch), Promethion_activity_food_F)
+
+Promethion_activity_food_M <- Promethion_activity_food_M %>%
+  dplyr::mutate(Feed_eficiency_distance_resid = residuals(model_fe_allm_m_resid)/sigma(model_fe_allm_m_resid))
+Promethion_activity_food_F <- Promethion_activity_food_F %>%
+  dplyr::mutate(Feed_eficiency_distance_resid = residuals(model_fe_allm_f_resid)/sigma(model_fe_allm_f_resid))
+
+Promethion_activity_food_MF <- rbind(Promethion_activity_food_M, Promethion_activity_food_F)
+
+
+Fig2_fe_distance <- Promethion_activity_food_MF %>%
+  ggplot(aes(x= (Distance_traveled/1000) ,y=Feed_eficiency_distance_resid))+
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color = "black")+ 
+  geom_point(aes(color= Category, shape = Sex), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  labs(y="Adj. feed efficiency", x="Distance traveled (km)") +
+  theme_classic(base_size = 10) +
+  facet_wrap(.~Sex, scales = "free", ncol =1) + 
+   theme(strip.background = element_blank(),
+        strip.text = element_blank()) 
+Fig2_fe_distance
+```
+
+
+### Energy expenditure
+```{r}
+Fig2_ee_weight<- Promethion_activity_ee %>%
+  ggplot(aes(x= Promethion_weight ,y=EE_average_per_hour, color= Category, group = Category)) +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5)+ 
+  geom_point(aes(shape = Sex), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  theme_classic(base_size = 10) +
+  labs(y = "Energy expenditure (kcal/h)", x = "Weight (g)") +
+  facet_wrap(.~Sex, scales = "free", ncol =1) + 
+  theme(strip.background = element_blank(),
+   strip.text = element_blank()) 
+Fig2_ee_weight
+```
+```{r}
+set.seed(719) 
+
+Promethion_activity_ee.2 <- Promethion_activity_ee %>%
+  drop_na(Promethion_weight)
+
+Promethion_activity_ee.2$Promethion_weight_norm <- predict(bestNormalize(Promethion_activity_ee.2$Promethion_weight))
+Promethion_activity_ee.2$EE_average_per_hour_norm<- predict(bestNormalize(Promethion_activity_ee.2$EE_average_per_hour))
+
+options(contrasts=c("contr.sum", "contr.poly"))
+
+model_ee<-(lmer(EE_average_per_hour_norm ~ Category*Sex + Sex*Promethion_weight_norm  + (Category |Batch/Sex/Promethion_Cabinet), Promethion_activity_ee.2))
+step(model_ee, keep ="Category")
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_ee.2<-(lmer(EE_average_per_hour ~ Category*Sex + Promethion_weight + (1 | Batch), Promethion_activity_ee.2))
+stats::shapiro.test(resid(model_ee.2))
+anova(lm(residuals(model_ee.2)~fitted.values(model_ee.2)))
+```
+```{r}
+Promethion_activity_ee.2_M <- Promethion_activity_ee.2 %>% dplyr::filter(Sex =="M")
+Promethion_activity_ee.2_F <- Promethion_activity_ee.2 %>% dplyr::filter(Sex =="F")
+
+model_ee.M<-(lmer(EE_average_per_hour ~ Category + Promethion_weight + (1 | Batch), Promethion_activity_ee.2_M))
+model_ee.F<-(lmer(EE_average_per_hour ~ Category + Promethion_weight + (1 | Batch), Promethion_activity_ee.2_F))
+
+shapiro.test(residuals(model_ee.M))
+shapiro.test(residuals(model_ee.F))
+
+aov(lm(residuals(model_ee.M)~fitted.values(model_ee.M)))
+aov(lm(residuals(model_ee.F)~fitted.values(model_ee.F)))
+
+car::Anova(model_ee.M, test.statistic ="F", type ="II")
+car::Anova(model_ee.F, test.statistic ="F", type ="II")
+
+effects::effect("Category", mod = model_ee.M, se =TRUE) %>% as.data.frame()
+effects::effect("Category", mod = model_ee.F, se =TRUE) %>% as.data.frame()
+```
+```{r}
+model_ee_residuals_M <-(lmer(EE_average_per_hour ~ Promethion_weight + (1 | Batch) , Promethion_activity_ee.2_M)) 
+Promethion_activity_ee.2_M$EE_average_per_hour_residual <- residuals(model_ee_residuals_M)/sigma(model_ee_residuals_M)
+
+model_ee_residuals_F <-(lmer(EE_average_per_hour ~  Promethion_weight + (1 | Batch) , Promethion_activity_ee.2_F)) 
+Promethion_activity_ee.2_F$EE_average_per_hour_residual <- residuals(model_ee_residuals_F)/sigma(model_ee_residuals_F)
+
+Promethion_activity_ee.2_MF <- rbind(Promethion_activity_ee.2_M, Promethion_activity_ee.2_F)
+
+Fig2_ee_resid <- Promethion_activity_ee.2_MF %>%
+  ggplot(aes(x = Category, y = EE_average_per_hour_residual, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. energy expenditure") +
+  facet_wrap(.~Sex, scales = "free_y", ncol =1) + 
+  theme(strip.background = element_blank(),
+   strip.text = element_blank()) +
+  theme(axis.title.x=element_blank()) +
+  theme(axis.text.x = element_text(face = "italic")) 
+Fig2_ee_resid
+```
+#### Circadian
+```{r}
+# Resting metabolic rate (RMR) for each cycle
+Circadian_RMR_all <- Circadian.2 %>%
+  dplyr::arrange(StartDate_common, desc(Cycle)) %>%
+  dplyr::group_by(MouseID) %>%
+  dplyr::summarise(All_RMR =mean(QR_EE_30)) %>%
+  #dplyr::filter(Day == 3 & Cycle == 0) %>%
+  dplyr::select(MouseID, All_RMR)%>%
+  dplyr::ungroup()
+Circadian_RMR_dark <- Circadian.2 %>% 
+  dplyr::filter(Cycle == 0)  %>% # 0 = dark cycle = activity period of mice (nocturnal)
+  dplyr::arrange(StartDate_common, desc(Cycle)) %>%
+  dplyr::group_by(MouseID) %>%
+  dplyr::summarise(Dark_RMR =mean(QR_EE_30))%>%
+  #dplyr::filter(Day == 3) %>%
+  dplyr::select(MouseID, Dark_RMR)%>%
+  dplyr::ungroup()
+Circadian_RMR_light <- Circadian.2 %>% 
+  dplyr::filter(Cycle == 1)  %>% # 1 = light cycle = resting period of mice (nocturnal)
+  dplyr::arrange(StartDate_common, desc(Cycle)) %>%
+  dplyr::group_by(MouseID) %>%
+  dplyr::summarise(Light_RMR =mean(QR_EE_30)) %>%
+  #dplyr::filter(Day == 3) %>%
+  dplyr::select(MouseID, Light_RMR)%>%
+  dplyr::ungroup()
+
+Circadian_RMR <- Circadian_RMR_all %>%
+  dplyr::left_join(Circadian_RMR_dark, by ="MouseID") %>% 
+  dplyr::left_join(Circadian_RMR_light, by ="MouseID") %>% 
+  dplyr::left_join(metadata, by =c("MouseID")) %>%
+  tidyr::drop_na(Promethion_weight)
+  
+```
+```{r}
+set.seed(612)
+options(contrasts=c("contr.sum", "contr.poly"))
+
+
+Circadian_RMR$All_RMR_norm<- predict(bestNormalize::log_x(Circadian_RMR$All_RMR))
+Circadian_RMR$Dark_RMR_norm<- predict(bestNormalize::log_x(Circadian_RMR$Dark_RMR))
+Circadian_RMR$Light_RMR_norm<- predict(bestNormalize::log_x(Circadian_RMR$Light_RMR))
+Circadian_RMR$Promethion_weight_norm<- predict(bestNormalize(Circadian_RMR$Promethion_weight))
+
+Circadian_RMR_M <- Circadian_RMR %>% dplyr::filter(Sex == "M")
+Circadian_RMR_F <- Circadian_RMR %>% dplyr::filter(Sex == "F")
+
+model_rmr_all_m<-(lmer(All_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch/Promethion_Cabinet), Circadian_RMR_M))
+model_rmr_dark_m<-(lmer(Dark_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch/Promethion_Cabinet), Circadian_RMR_M))
+model_rmr_light_m<-(lmer(Light_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch/Promethion_Cabinet), Circadian_RMR_M))
+
+model_rmr_all_f<-(lmer(All_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch/Promethion_Cabinet), Circadian_RMR_F))
+model_rmr_dark_f<-(lmer(Dark_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch/Promethion_Cabinet), Circadian_RMR_F))
+model_rmr_light_f<-(lmer(Light_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch/Promethion_Cabinet), Circadian_RMR_F))
+
+step(model_rmr_all_m)
+step(model_rmr_dark_m)
+step(model_rmr_light_m)
+
+step(model_rmr_all_f)
+step(model_rmr_dark_f)
+step(model_rmr_light_f)
+```
+```{r}
+set.seed(149)
+
+options(contrasts=c("contr.sum", "contr.poly"))
+model_rmr_all_m2<-(lmer(All_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_M))
+model_rmr_dark_m2<-(lmer(Dark_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_M))
+model_rmr_light_m2<-(lmer(Light_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_M))
+
+model_rmr_all_f2<-(lmer(All_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_F))
+model_rmr_dark_f2<-(lmer(Dark_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_F))
+model_rmr_light_f2<-(lmer(Light_RMR_norm ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_F))
+
+shapiro.test(residuals(model_rmr_all_m2))
+shapiro.test(residuals(model_rmr_dark_m2))
+shapiro.test(residuals(model_rmr_light_m2))
+anova(lm(residuals(model_rmr_all_m2) ~ fitted.values(model_rmr_all_m2)))
+anova(lm(residuals(model_rmr_dark_m2) ~ fitted.values(model_rmr_dark_m2)))
+anova(lm(residuals(model_rmr_light_m2) ~ fitted.values(model_rmr_light_m2)))
+
+shapiro.test(residuals(model_rmr_all_f2))
+shapiro.test(residuals(model_rmr_dark_f2))
+shapiro.test(residuals(model_rmr_light_f2))
+anova(lm(residuals(model_rmr_all_f2) ~ fitted.values(model_rmr_all_f2)))
+anova(lm(residuals(model_rmr_dark_f2) ~ fitted.values(model_rmr_dark_f2)))
+anova(lm(residuals(model_rmr_light_f2) ~ fitted.values(model_rmr_light_f2)))
+```
+```{r eval =FALSE }
+plot(model_rmr_all_m2)
+plot(model_rmr_dark_m2)
+plot(model_rmr_light_m2)
+
+plot(model_rmr_all_f2)
+plot(model_rmr_dark_f2)
+plot(model_rmr_light_f2)
+```
+```{r eval =FALSE }
+options(contrasts=c("contr.sum", "contr.poly"))
+
+results_model_rmr_all_m <- car::Anova(model_rmr_all_m2, test.statistic ="F", type ="II") %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "model_term") %>%
+  dplyr::mutate(Circ = "All", 
+                Sex = "M") 
+results_model_rmr_dark_m <- car::Anova(model_rmr_dark_m2, test.statistic ="F", type ="II") %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "model_term") %>%
+  dplyr::mutate(Circ = "Dark", 
+                Sex = "M") 
+results_model_rmr_light_m<-car::Anova(model_rmr_light_m2, test.statistic ="F", type ="II") %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "model_term") %>%
+  dplyr::mutate(Circ = "Light", 
+                Sex = "M")
+
+results_model_rmr_all_f <- car::Anova(model_rmr_all_f2, test.statistic ="F", type ="II") %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "model_term") %>%
+  dplyr::mutate(Circ = "All", 
+                Sex = "F") 
+results_model_rmr_dark_f <- car::Anova(model_rmr_dark_f2, test.statistic ="F", type ="II") %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "model_term") %>%
+  dplyr::mutate(Circ = "Dark", 
+                Sex = "F") 
+results_model_rmr_light_f <-car::Anova(model_rmr_light_f2, test.statistic ="F", type ="II") %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "model_term") %>%
+  dplyr::mutate(Circ = "Light", 
+                Sex = "F")
+
+
+rbind(results_model_rmr_all_m, results_model_rmr_dark_m, results_model_rmr_light_m, 
+      results_model_rmr_all_f, results_model_rmr_dark_f, results_model_rmr_light_f) %>%
+  dplyr::filter(model_term == "Category") 
+```
+```{r}
+model_rest_all.rmr_meff<-(lmer(All_RMR ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_M))
+model_rest_dark.rmr_meff<-(lmer(Dark_RMR ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_M))
+model_rest_light.rmr_meff<-(lmer(Light_RMR ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_M))
+
+model_rest_all.rmr_feff<-(lmer(All_RMR ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_F))
+model_rest_dark.rmr_feff<-(lmer(Dark_RMR ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_F))
+model_rest_light.rmr_feff<-(lmer(Light_RMR ~ Category+ Promethion_weight_norm + (1 |Batch), Circadian_RMR_F))
+
+eff_RMR_all_m<- effects::effect("Category", model_rest_all.rmr_meff, se = TRUE) %>% as.data.frame %>% dplyr::mutate(Circ ="All", Sex ="M")
+eff_RMR_dark_m<- effects::effect("Category", model_rest_dark.rmr_meff, se = TRUE) %>% as.data.frame %>% dplyr::mutate(Circ ="dark", Sex ="M")
+eff_RMR_light_m<- effects::effect("Category", model_rest_light.rmr_meff, se = TRUE) %>% as.data.frame %>% dplyr::mutate(Circ ="light", Sex ="M")
+
+eff_RMR_all_f<- effects::effect("Category", model_rest_all.rmr_feff, se = TRUE) %>% as.data.frame %>% dplyr::mutate(Circ ="All", Sex ="F")
+eff_RMR_dark_f<- effects::effect("Category", model_rest_dark.rmr_feff, se = TRUE) %>% as.data.frame %>% dplyr::mutate(Circ ="dark", Sex ="F")
+eff_RMR_light_f<- effects::effect("Category", model_rest_light.rmr_feff, se = TRUE) %>% as.data.frame %>% dplyr::mutate(Circ ="light", Sex ="F")
+
+rbind(eff_RMR_all_m, eff_RMR_dark_m, eff_RMR_light_m, eff_RMR_all_f, eff_RMR_dark_f, eff_RMR_light_f) %>% dplyr::select(Sex, Category, Circ, fit, se)
+```
+```{r}
+model_rest_all.rmr_m_resid<-(lmer(All_RMR_norm ~  Promethion_weight_norm + (1 |Batch), Circadian_RMR_M))
+model_rest_dark.rmr_m_resid<-(lmer(Dark_RMR_norm ~  Promethion_weight_norm + (1 |Batch), Circadian_RMR_M))
+model_rest_light.rmr_m_resid<-(lmer(Light_RMR_norm ~  Promethion_weight_norm + (1 |Batch), Circadian_RMR_M))
+
+model_rest_all.rmr_f_resid<-(lmer(All_RMR_norm ~  Promethion_weight_norm + (1 |Batch), Circadian_RMR_F))
+model_rest_dark.rmr_f_resid<-(lmer(Dark_RMR_norm ~ Promethion_weight_norm + (1 |Batch), Circadian_RMR_F))
+model_rest_light.rmr_f_resid<-(lmer(Light_RMR_norm ~  Promethion_weight_norm + (1 |Batch), Circadian_RMR_F))
+
+Circadian_RMR_M2 <- Circadian_RMR_M %>% 
+  dplyr::mutate(all_rmr_resid = residuals(model_rest_all.rmr_m_resid)/sigma(model_rest_all.rmr_m_resid), 
+                dark_rmr_resid = residuals(model_rest_dark.rmr_m_resid)/sigma(model_rest_dark.rmr_m_resid),
+                light_rmr_resid = residuals(model_rest_light.rmr_m_resid)/sigma(model_rest_light.rmr_m_resid))
+Circadian_RMR_F2 <- Circadian_RMR_F %>% 
+  dplyr::mutate(all_rmr_resid = residuals(model_rest_all.rmr_f_resid)/sigma(model_rest_all.rmr_f_resid), 
+                dark_rmr_resid = residuals(model_rest_dark.rmr_f_resid)/sigma(model_rest_dark.rmr_f_resid),
+                light_rmr_resid = residuals(model_rest_light.rmr_f_resid)/sigma(model_rest_light.rmr_f_resid))
+
+Circadian_rmr_resid <- rbind(Circadian_RMR_M2, Circadian_RMR_F2) %>%
+  dplyr::select(MouseID, dark_rmr_resid, light_rmr_resid, all_rmr_resid) %>%
+  dplyr::rename(Dark = dark_rmr_resid, Light = light_rmr_resid, All = all_rmr_resid) %>%
+  tidyr::gather(Circ, mean_resting_metabolic_rate_residuals, Dark:All) %>%
+  dplyr::left_join(metadata, by = c("MouseID"))
+
+Fig2_rmr_dark_light <- Circadian_rmr_resid %>% 
+  dplyr::filter(Circ != "All") %>% 
+  ggplot(aes(x = Category, y = mean_resting_metabolic_rate_residuals, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(face = "italic")) +
+    facet_grid(Sex~Circ) + 
+  theme(#strip.background = element_blank(),
+   strip.text.y = element_blank()) +
+  labs(y="Adj. resting metabolic rate") 
+Fig2_rmr_dark_light
+
+FigS3_rmr_all <- Circadian_rmr_resid %>% 
+  dplyr::filter(Circ == "All") %>%  
+  ggplot(aes(x = Category, y = mean_resting_metabolic_rate_residuals, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(face = "italic")) +
+    facet_grid(.~Sex) + 
+  theme(strip.background = element_blank(),
+   strip.text = element_blank()) +
+  labs(y="Adj. resting metabolic rate") 
+FigS3_rmr_all
+```
+### Figure 2: Higher physical activity and metabolic energy expenditure in mice with live C. minuta
+```{r}
+Fig2_legend <- cowplot::get_legend(metadata_Cmin %>% 
+  dplyr::mutate(Sex = ifelse(Sex == "F", "Female", "Male"), 
+                Category = ifelse(Category == "Killed", "Killed-CM", "Live-CM"), 
+                Sex_Category = paste(Sex, Category, sep = " ")) %>%
+  ggplot(aes(x = Category, y = qPCR_Cmin_per_gCC, shape = Sex_Category, color = Sex_Category)) + 
+  geom_point(aes(shape = Sex_Category, color= Sex_Category), alpha =0.7, size =0.5, show.legend = T) +
+  scale_shape_manual(values=c(16, 16,4, 4)) + 
+  scale_color_manual(values=c(color_Category, color_Category)) +
+  theme_classic(base_size = 10) +
+  guides(shape = guide_legend(override.aes = list(size = 3, alpha = 1))) +
+  theme(legend.title=element_blank()) + 
+  theme(legend.position = "bottom"))
+
+Fig2_align_1 <- cowplot::align_plots(Fig2_beam_breaks + theme(legend.position="none"),
+                                 Fig2_bb_cmin + theme(legend.position="none"),
+                                 Fig2_bb_fe + theme(legend.position="none"),
+                                 Fig2_distance + theme(legend.position="none"),  
+                                 Fig2_distance_cmin + theme(legend.position="none"), 
+                                 Fig2_fe_distance + theme(legend.position="none"),
+                                 align = 'hv', axis = 'tblr')
+
+Fig2_align_2 <- cowplot::align_plots(Fig2_ee_weight + theme(legend.position="none"),
+                                 Fig2_ee_resid + theme(legend.position="none"),
+                                 Fig2_rmr_dark_light + theme(legend.position="none"),
+                                 align = 'hv', axis = 'tblr')
+
+
+Fig2_1 <- cowplot::plot_grid(NA,
+                               Fig2_align_1[[1]],  
+                               Fig2_align_1[[2]], 
+                               Fig2_align_1[[3]], 
+                               NA, 
+                               Fig2_align_1[[4]], 
+                               Fig2_align_1[[5]], 
+                               Fig2_align_1[[6]], 
+                               ncol=4, nrow=2, labels = c(NA,"A", "C", "E", NA, "B", "D", "F"), label_size = 12, rel_widths = c(0.3, 1, 1.5, 1.5), rel_heights = c(1.2, 2))
+
+
+Fig2_2 <- cowplot::plot_grid(NA, 
+                               Fig2_align_2[[1]], 
+                               Fig2_align_2[[2]], 
+                               Fig2_align_2[[3]], 
+                               ncol=4, nrow=1, labels = c(NA, "G", "H", "I"),label_size = 12, rel_widths = c(0.3, 1.2, 1, 1.8))
+
+Figure2 <- cowplot::plot_grid(Fig2_1, 
+                             Fig2_2, 
+                             Fig2_legend, 
+                             ncol=1, nrow=3, rel_heights = c(3.2, 2, 0.3))
+```
+```{r fig.width=6.5, fig.height= 7.5}
+Figure2
+```
+```{r eval = FALSE}
+ggsave("./Figure2.pdf", plot = Figure2, device = cairo_pdf,  
+  width = 17,
+  height = 19,
+  units = "cm")
+```
+Figure S3: Mouse voluntary activity and average resting metabolic rate
+```{r}
+FigS3_align <- cowplot::align_plots(FigS3_speed + theme(legend.position="none"),
+                                      FigS3_rmr_all + theme(legend.position="none"), 
+                                      align = 'hv', axis = 'tblr')
+
+
+FigS3_1 <- cowplot::plot_grid(FigS3_align[[1]], 
+                                    FigS3_align[[2]],
+                                    ncol=2, nrow=1, labels = c("A", "B"), label_size = 12, rel_widths = c(0.9, 1.5))
+FigS3 <- cowplot::plot_grid(FigS3_1, 
+                                    Fig2_legend,
+                                    ncol=1, nrow=2, rel_heights = c(1, 0.1 ))
+```
+```{r fig.width=3.5, fig.height= 3}
+FigS3
+```
+```{r eval =FALSE}
+ggsave("./FigS3.pdf", plot = FigS3, device = cairo_pdf,  
+  width = 9,
+  height = 7.5,
+  units = "cm")
+```
+
+## C. minuta increases gut microbial biomass and remodels diversity
+### Microbial biomass
+```{r}
+Fig3_qPCR_bacteria <- metadata_Cmin %>% 
+  dplyr::mutate(SQ_per_gCC_e10 = qPCR_16S_SQ_per_gCC/10^10) %>%
+  ggplot(aes(x = Category, y = SQ_per_gCC_e10, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = expression(paste("Microbes (GE/g) x", e^10))) +
+  theme(axis.text.x = element_text(face = "italic")) 
+Fig3_qPCR_bacteria
+```
+```{r}
+set.seed(759)
+metadata_Cmin <- metadata_Cmin %>% 
+  dplyr::mutate(qPCR_16S_SQ_per_gCC = as.numeric(qPCR_16S_SQ_per_gCC), 
+                qPCR_16S_SQ_per_gCC_norm = predict(bestNormalize(qPCR_16S_SQ_per_gCC)))
+
+options(contrasts=c("contr.sum", "contr.poly"))
+model_biomass<- lmerTest::lmer(qPCR_16S_SQ_per_gCC_norm ~ Category*Sex + T6_weight + Plate + (1|qPCR_Round/Batch/Sex), data = metadata_Cmin)
+lmerTest::step(model_biomass, keep = "Category")
+```
+```{r}
+model_biomass.2<- lmer(qPCR_16S_SQ_per_gCC_norm ~ Category + Plate + (1 | Batch:qPCR_Round), data = metadata_Cmin)
+
+shapiro.test(residuals(model_biomass.2))
+anova(lm(residuals(model_biomass.2) ~ fitted(model_biomass.2))) # test for heteroscedasticity 
+```
+```{r}
+plot(model_biomass.2)
+```
+```{r}
+car::Anova(model_biomass.2, type = "II", test.statistic ="F")
+```
+```{r}
+model_biomass.eff<- lmer(qPCR_16S_SQ_per_gCC~ Category + Plate + (1 | Batch:qPCR_Round), data = metadata_Cmin)
+effects::effect("Category", model_biomass.eff, se =TRUE) %>% as.data.frame
+```
+### Corrleation microbial biomass ~ C. minuta 
+```{r}
+Fig3_Cmin_biomass<- metadata_Cmin %>%
+  ggplot(aes(x= qPCR_Cmin_per_gCC_norm ,y=qPCR_16S_SQ_per_gCC_norm)) +
+  geom_smooth(method = "lm", se = F, alpha = 0.5, size = 0.5, color ="black")+ 
+  geom_point(aes(shape = Sex, color =Category), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  theme_classic(base_size = 10) +
+  stat_cor(method = "spearman",  cor.coef.name = c("rho"), size = 3) +
+  labs(y = "Norm. Microbes", x = "Norm. C. minuta")
+Fig3_Cmin_biomass
+```
+### Modification of profiled metagenomic data
+```{r eval = FALSE}
+# Unrarefied OTUs
+reads_unrare <- Bracken_otu_table_reads %>%
+  dplyr::select(OTU_ID, contains("CC"), # select only cecal content samples
+                -taxonomy, -contains(Metagenomics_exclude_id)) %>% 
+  dplyr::rename(rowname = "OTU_ID") %>% 
+  tidyr::gather(var, value, -rowname) %>% 
+  tidyr::spread(rowname, value) %>%
+  tibble::column_to_rownames(var = "var") 
+
+names(reads_unrare) <- properColnames(reads_unrare)
+
+# Rarefied OTUs
+set.seed(2)
+reads_rare = reads_unrare %>% 
+ GUniFrac::Rarefy(460000)
+reads_rare = reads_rare$otu.tab.rff %>% 
+  as.data.frame()
+```
+### Reads normalization by micriobial biomass (approximation to absolute abundance)
+```{r eval=FALSE}
+reads_rare_norm <- reads_rare %>%
+  tibble::rownames_to_column(var = "rowname") %>% 
+  tidyr::gather(var, value, -rowname) %>% 
+  tidyr::spread(rowname, value) %>% 
+  dplyr::rename(OTU_ID = var) 
+
+reads_rare_norm[,2:183] <- as.data.table(lapply(reads_rare_norm[,2:183], as.numeric))
+
+reads_rare_norm <- reads_rare_norm %>%
+  dplyr::rename(rowname = OTU_ID) %>%
+  dplyr::mutate_if(is.numeric,function(x) (x/sum(x))) %>%
+  tidyr::gather(var, value, -rowname) %>% 
+  tidyr::spread(rowname, value) %>% 
+  dplyr::rename(sampleid = var) %>%
+  dplyr::left_join(Metagenomics_metadata_CC, by ="sampleid") %>%
+  dplyr::left_join(metadata, by ="MouseID") %>%
+  dplyr::left_join(qPCR_data, by ="MouseID") %>%
+  dplyr::mutate(qPCR_16S_SQ_per_gCC = as.numeric(qPCR_16S_SQ_per_gCC))  %>%
+  dplyr::group_by(sampleid) %>%
+  dplyr::mutate_each(funs(.*qPCR_16S_SQ_per_gCC), starts_with("s__"))
+
+write.table(reads_rare_norm, file = "./data/Interim_output/reads_rare_norm.txt",row.names=FALSE,sep="\t", quote = FALSE)
+```
+```{r}
+reads_rare_norm<- fread("./data/Interim_output/reads_rare_norm.txt") 
+```
+### Taxa barplots
+```{r}
+Taxonomy <- Bracken_otu_table_reads %>%
+  dplyr::select(OTU_ID, taxonomy) %>%
+  dplyr::mutate(var = OTU_ID) 
+
+Taxonomy$var <-properNames(Taxonomy$var)
+Taxonomy$OTU_ID <- gsub(" ", "_", Taxonomy$OTU_ID)
+```
+```{r}
+reads_rare_norm_metadata <- reads_rare_norm %>%
+  tibble::column_to_rownames(var = "sampleid") %>%
+  dplyr::select(-contains("s__"))
+
+reads_rare_norm_reads <- reads_rare_norm %>%
+  dplyr::select(sampleid, contains("s__")) %>%
+  tidyr::gather(var, value, -sampleid) %>% 
+  tidyr::spread(sampleid, value) %>%
+  dplyr::mutate_if(is.numeric, round) %>%
+  tibble::column_to_rownames(var = "var")
+
+# Separate taxonomy
+tax_levels = c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+# Also note that the unclassified reads do not count for the total seq count!
+```
+```{r}
+MF_bracken <- reads_rare_norm_reads %>%
+  tibble::rownames_to_column(var = "var") %>%
+  dplyr::mutate_at(c(2:183), as.numeric) %>%
+  dplyr::left_join(Taxonomy, by ="var") %>% 
+  dplyr::rename(name = var) %>% 
+  dplyr::filter(name != "Unclassified") %>% 
+  tidyr::separate(taxonomy, into = tax_levels, sep = ";") 
+
+# Total counts for relative abundance
+Total_counts = MF_bracken %>% 
+  dplyr::select_if(is.numeric) %>% 
+  dplyr::summarise_all(sum)
+
+# summarize genus
+Taxa_df = MF_bracken %>%
+  dplyr::group_by(Genus) %>% 
+  dplyr::summarise_if(is.numeric, sum) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::rename("Taxon" = "Genus")
+
+# Bind tables and transform to relative abundance
+Taxa_df_raw = Taxa_df %>% 
+  dplyr::rowwise() %>% 
+  dplyr::mutate(mean_abund = mean(c_across(where(is.numeric)))) 
+
+# Filter taxa with mean abund < 0.5
+Taxa_vec = Taxa_df_raw %>% 
+  dplyr::filter(mean_abund >= 100000000) %>% 
+  dplyr::pull(Taxon)
+
+# Create df of abundant taxa
+Abundant_df = Taxa_df_raw %>% 
+  dplyr::filter(Taxon %in% Taxa_vec)
+
+# Collapse rare taxa into 'other'
+Rare_df = Taxa_df_raw %>% 
+  ungroup() %>% 
+  dplyr::filter(!(Taxon %in% Taxa_vec)) %>% 
+  dplyr::summarise_if(is.numeric, sum) %>% 
+  dplyr::mutate(Taxon = "Other") %>% 
+  dplyr::select(Taxon, everything())
+
+# Join and melt
+Taxa_df.2 = bind_rows(Abundant_df, Rare_df) %>% 
+  dplyr::select(-mean_abund) %>% 
+  tidyr::pivot_longer(cols = -Taxon, names_to = "Sample", values_to = "Abundance")
+```
+```{r}
+metadata_taxa_barplot <- metadata %>%
+  dplyr::select(MouseID, Category, Batch) %>%
+  dplyr::group_by(Category, Batch) %>%
+  dplyr::mutate(Mouse_nr_Category_Batch = row_number()) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(MouseID, Mouse_nr_Category_Batch)
+
+Taxa_barplot <- reads_rare_norm_metadata %>%
+  tibble::rownames_to_column(var = "Sample") %>%
+  dplyr::left_join(Taxa_df.2, by = "Sample") %>%
+  dplyr::left_join(metadata_taxa_barplot, by = "MouseID") %>%
+  dplyr::mutate(Abundance = as.numeric(Abundance))
+```
+```{r fig.width=10, fig.height=6}
+taxabarplot_levels <- reads_rare_norm_metadata %>% 
+  dplyr::arrange(Category, -qPCR_16S_SQ_per_gCC) %>%
+  dplyr::pull(MouseID)
+
+FigS4_Taxa_barplot<- Taxa_barplot %>%
+  dplyr::mutate(Abundance = as.numeric(Abundance)) %>%
+  tidyr::separate(Taxon, into =c(NA, "Taxon"), sep= "__") %>%
+  dplyr::mutate(Taxon = replace_na(Taxon, "Other")) %>%
+  dplyr::mutate(Taxon = factor(Taxon, levels = c("Alistipes", "Bacteroides", "COE1", "Eisenbergiella","Enterocloster", "Flavonifractor", "Parabacteroides", "Phocaeicola", "Ruthenibacterium", "Tolumonas", "Other"))) %>%
+  dplyr::mutate(Abundance_10x10 = Abundance/10^10) %>%
+  dplyr::mutate(Category2 = ifelse(Category == "Killed", "Killed-CM", "Live-CM")) %>%
+  ggplot(aes(x=factor(MouseID, levels = taxabarplot_levels), y=Abundance_10x10, fill=Taxon)) +
+  geom_bar(stat="identity") +
+  theme_classic(base_size = 10) + 
+  scale_fill_manual(values = c("#000000", "#b6dbff","#920000", "#009292", "#ffb6db", "#ffff6d", "#db6d00", "#006ddb", "#24ff24", "#ff6db6", "#004949"), 
+                    name = "Genus") +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  coord_cartesian(clip = "off") +
+  theme(legend.position="right", legend.key.size=unit(0.4, "cm"),
+        legend.text=element_text(face = "italic")) +
+  ggh4x::facet_grid2(Sex~Category2, scales = "free_x", independent = "x") +
+  guides(fill=guide_legend(title.position = "top")) +
+  labs(y= expression(paste("Microbes (GE/g) x", e^10)), x ="Mice") +
+    theme(strip.background.y = element_blank(),
+        strip.text.y = element_blank()) 
+FigS4_Taxa_barplot
+```
+### alpha and beta diversity in qiime with absolute sequences
+```{r eval = FALSE}
+gc()
+# prepare file
+qiime2_reads_rare_norm<- reads_rare_norm %>%
+  dplyr::select(sampleid, contains("s__")) %>%
+  dplyr::rename(rowname = sampleid) %>% 
+  tidyr::gather(var, value, -rowname) %>% 
+  tidyr::spread(rowname, value) %>%
+  dplyr::group_by(var) %>%
+  dplyr::mutate(sum_abubnd = sum(c_across(where(is.numeric)))) %>%
+  dplyr::filter(sum_abubnd > 0) %>%
+  dplyr::select(-sum_abubnd) %>%
+  dplyr::ungroup() %>%
+  dplyr::left_join(Taxonomy, by ="var") %>%
+  dplyr::select(contains("OTU"), contains("CC"), taxonomy) %>%
+  dplyr::rename("#OTU ID" = OTU_ID)
+gc()
+#save output
+write.table(qiime2_reads_rare_norm, file = "./data/Interim_output/qiime2_reads_rare_norm.txt", sep = "\t" , row.names = FALSE, quote = FALSE)
+```
+```{bash eval=FALSE}
+source activate /ebio/abt3_projects/Christensenella_CM20/envs/qiime2 #path to qiime2-2022.2 environment
+
+##qiime import data
+biom convert -i ./data/Interim_output/qiime2_reads_rare_norm.txt \
+          -o ./data/Interim_output/qiime2_reads_rare_norm.biom \
+          --to-hdf5 --process-obs-metadata taxonomy \
+          --table-type "OTU table"
+
+qiime tools import \
+          --input-path ./data/Interim_output/qiime2_reads_rare_norm.biom \
+          --output-path ./data/Interim_output/qiime2_reads_rare_norm.qza \
+          --type 'FeatureTable[Frequency]' \
+          --input-format BIOMV210Format
+
+##run diversity
+qiime diversity alpha \
+          --p-metric observed_features \
+          --i-table ./data/Interim_output/qiime2_reads_rare_norm.qza \
+          --o-alpha-diversity ./data/Interim_output/alpha_observed_features.qza
+
+qiime diversity alpha \
+          --p-metric shannon \
+          --i-table ./data/Interim_output/qiime2_reads_rare_norm.qza \
+          --o-alpha-diversity ./data/Interim_output/alpha_shannon.qza
+
+qiime diversity alpha \
+          --p-metric pielou_e \
+          --i-table ./data/Interim_output/qiime2_reads_rare_norm.qza \
+          --o-alpha-diversity ./data/Interim_output/alpha_pielou.qza
+          
+qiime diversity alpha-phylogenetic \
+          --p-metric faith_pd \
+          --i-table ./data/Interim_output/qiime2_reads_rare_norm.qza \
+          --i-phylogeny ./data/Metagenomics/rooted_tree.qza \
+          --o-alpha-diversity ./data/Interim_output/alpha_faithPD.qza
+
+
+qiime diversity beta-phylogenetic \
+          --p-metric weighted_unifrac \
+          --i-table ./data/Interim_output/qiime2_reads_rare_norm.qza \
+          --i-phylogeny ./data/Metagenomics/rooted_tree.qza \
+          --o-distance-matrix ./data/Interim_output/beta_wUF.qza
+
+qiime diversity beta-phylogenetic \
+          --p-metric unweighted_unifrac \
+          --i-table ./data/Interim_output/qiime2_reads_rare_norm.qza \
+          --i-phylogeny ./data/Metagenomics/rooted_tree.qza \
+          --o-distance-matrix ./data/Interim_output/beta_uwUF.qza
+
+##export data
+qiime tools export \
+  --input-path ./data/Interim_output/alpha_observed_features.qza \
+  --output-path ./data/Interim_output/alpha_observed_features
+
+qiime tools export \
+  --input-path ./data/Interim_output/alpha_shannon.qza \
+  --output-path ./data/Interim_output/alpha_shannon
+
+qiime tools export \
+  --input-path ./data/Interim_output/alpha_pielou.qza \
+  --output-path ./data/Interim_output/alpha_pielou
+
+qiime tools export \
+  --input-path ./data/Interim_output/alpha_faithPD.qza \
+  --output-path ./data/Interim_output/alpha_faithPD
+
+qiime tools export \
+  --input-path ./data/Interim_output/beta_wUF.qza \
+  --output-path ./data/Interim_output/beta_wUF
+
+qiime tools export \
+  --input-path ./data/Interim_output/beta_uwUF.qza \
+  --output-path ./data/Interim_output/beta_uwUF
+```
+#### alpha diversity
+```{r}
+Alpha_FPD <- fread("./data/Interim_output/alpha_faithPD/alpha-diversity.tsv") %>%
+  dplyr::rename(sampleid = "#SampleID")
+Alpha_observedF <- fread("./data/Interim_output/alpha_observed_features/alpha-diversity.tsv") %>%
+  dplyr::rename(sampleid = "V1")
+Alpha_S <- fread("./data/Interim_output/alpha_shannon/alpha-diversity.tsv") %>%
+  dplyr::rename(sampleid = "V1")
+Alpha_P <- fread("./data/Interim_output/alpha_pielou/alpha-diversity.tsv") %>%
+  dplyr::rename(sampleid = "V1")
+  
+Alpha_div <- Alpha_FPD %>%
+  dplyr::left_join(Alpha_observedF, by = "sampleid") %>%
+  dplyr::left_join(Alpha_S, by = "sampleid") %>%
+  dplyr::left_join(Alpha_P, by = "sampleid") %>%
+  dplyr::left_join(Metagenomics_metadata_CC, by = "sampleid") %>%
+  dplyr::filter(!grepl(paste(Metagenomics_exclude_id, collapse="|"), sampleid)) %>%
+  dplyr::left_join(metadata, by = "MouseID")
+```
+```{r}
+Fig3_SE <- Alpha_div %>%
+  ggplot(aes(x = Category, y = shannon_entropy, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(legend.position="right") +
+  labs(y = "Shannon Entropy") +
+  theme(axis.text.x = element_text(face = "italic")) +
+  theme(axis.title.x=element_blank())+
+  facet_grid(.~Sex)
+Fig3_SE
+
+Fig3_OF <- Alpha_div %>%
+  ggplot(aes(x = Category, y = observed_features, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(legend.position="right") +
+  labs(y = "# microbial species") +
+  theme(axis.text.x = element_text(face = "italic")) +
+  theme(axis.title.x=element_blank())+
+  facet_grid(.~Sex)
+Fig3_OF
+
+FigS4_FDP  <- Alpha_div %>%
+  ggplot(aes(x = Category, y = faith_pd, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(legend.position="right") +
+  labs(y = "Faith's PD") +
+  theme(axis.text.x = element_text(face = "italic")) +
+  theme(axis.title.x=element_blank()) +
+  facet_grid(.~Sex)
+FigS4_FDP 
+
+FigS4_PE  <- Alpha_div %>%
+  ggplot(aes(x = Category, y = pielou_evenness, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(legend.position="right") +
+  labs(y = "Pilou evenness") +
+  theme(axis.text.x = element_text(face = "italic")) +
+  theme(axis.title.x=element_blank())+
+  facet_grid(.~Sex)
+FigS4_PE 
+```
+wilcox.test due to problems with normality 
+```{r}
+options(backup_options)
+Alpha_div_M <- Alpha_div %>%
+  dplyr::filter(Sex =="M")
+Alpha_div_F <- Alpha_div %>%
+  dplyr::filter(Sex =="F")
+```
+```{r}
+print("se M")
+wilcox.test(shannon_entropy~Category, data = Alpha_div_M, exact = FALSE, correct = FALSE, conf.int = FALSE)
+print("se F")
+wilcox.test(shannon_entropy~Category, data = Alpha_div_F, exact = FALSE, correct = FALSE, conf.int = FALSE)
+print("pe M")
+wilcox.test(pielou_evenness~Category, data = Alpha_div_M, exact = FALSE, correct = FALSE, conf.int = FALSE)
+print("pe F")
+wilcox.test(pielou_evenness~Category, data = Alpha_div_F, exact = FALSE, correct = FALSE, conf.int = FALSE)
+print("fpd M")
+wilcox.test(faith_pd~Category, data = Alpha_div_M, exact = FALSE, correct = FALSE, conf.int = FALSE)
+print("fpd F")
+wilcox.test(faith_pd~Category, data = Alpha_div_F, exact = FALSE, correct = FALSE, conf.int = FALSE)
+print("of M")
+wilcox.test(observed_features~Category, data = Alpha_div_M, exact = FALSE, correct = FALSE, conf.int = FALSE)
+print("of F")
+wilcox.test(observed_features~Category, data = Alpha_div_F, exact = FALSE, correct = FALSE, conf.int = FALSE)
+```
+```{r}
+standard_error <- function(x) sd(x) / sqrt(length(x))
+
+mean_se_treat_M <- Alpha_div_M %>%
+  dplyr::group_by(Category) %>%
+  dplyr::summarise(mean = mean(shannon_entropy), se = standard_error(shannon_entropy))%>%
+  dplyr::mutate(alpha = "se")
+
+mean_pe_treat_M <- Alpha_div_M %>%
+  dplyr::group_by(Category) %>%
+  dplyr::summarise(mean = mean(pielou_evenness), se = standard_error(pielou_evenness))%>%
+  dplyr::mutate(alpha = "pe")
+
+mean_fdp_treat_M <- Alpha_div_M%>%
+  dplyr::group_by(Category) %>%
+  dplyr::summarise(mean = mean(faith_pd), se = standard_error(faith_pd))%>%
+  dplyr::mutate(alpha = "fdp")
+
+mean_of_treat_M <- Alpha_div_M %>%
+  dplyr::group_by(Category) %>%
+  dplyr::summarise(mean = mean(observed_features), se = standard_error(observed_features)) %>%
+  dplyr::mutate(alpha = "of")
+
+rbind(mean_se_treat_M, mean_pe_treat_M, mean_fdp_treat_M, mean_of_treat_M)
+```
+```{r}
+mean_se_treat_F <- Alpha_div_F %>%
+  dplyr::group_by(Category) %>%
+  dplyr::summarise(mean = mean(shannon_entropy), se = standard_error(shannon_entropy))%>%
+  dplyr::mutate(alpha = "se")
+
+mean_pe_treat_F <- Alpha_div_F %>%
+  dplyr::group_by(Category) %>%
+  dplyr::summarise(mean = mean(pielou_evenness), se = standard_error(pielou_evenness))%>%
+  dplyr::mutate(alpha = "pe")
+
+mean_fdp_treat_F<- Alpha_div_F%>%
+  dplyr::group_by(Category) %>%
+  dplyr::summarise(mean = mean(faith_pd), se = standard_error(faith_pd))%>%
+  dplyr::mutate(alpha = "fdp")
+
+mean_of_treat_F <- Alpha_div_F %>%
+  dplyr::group_by(Category) %>%
+  dplyr::summarise(mean = mean(observed_features), se = standard_error(observed_features)) %>%
+  dplyr::mutate(alpha = "of")
+
+rbind(mean_se_treat_F, mean_pe_treat_F, mean_fdp_treat_F, mean_of_treat_F)
+```
+#### beta diversity
+```{r}
+Beta_wUF <- fread("./data/Interim_output/beta_wUF/distance-matrix.tsv")
+Beta_uwUF <- fread("./data/Interim_output/beta_uwUF/distance-matrix.tsv")
+
+Beta_wUF.2 <- Beta_wUF %>%
+  dplyr::filter(!grepl(paste(Metagenomics_exclude_id, collapse="|"), V1)) %>%
+  dplyr::select(-contains(Metagenomics_exclude_id)) %>%
+  dplyr::arrange(V1) %>%
+  dplyr::select(order(colnames(.))) %>%
+  tibble::column_to_rownames(var = "V1")
+
+Beta_uwUF.2 <- Beta_uwUF %>%
+  dplyr::filter(!grepl(paste(Metagenomics_exclude_id, collapse="|"), V1)) %>%
+  dplyr::select(-contains(Metagenomics_exclude_id)) %>%
+  dplyr::arrange(V1) %>%
+  dplyr::select(order(colnames(.))) %>%
+  tibble::column_to_rownames(var = "V1")
+
+reads_rare_norm_metadata <- reads_rare_norm_metadata[ order(row.names(reads_rare_norm_metadata)), ] 
+
+reads_rare_norm_metadata.melt <- reads_rare_norm_metadata %>% 
+  tibble::rownames_to_column(var = "sampleid")  %>%
+  dplyr::select(sampleid, Category, Sex) %>%
+    mutate_if(is.factor,as.character)
+
+wUF_melt <- melt(as.matrix(Beta_wUF.2)) %>%
+    filter(as.character(Var1) != as.character(Var2)) %>%
+    mutate_if(is.factor,as.character)
+
+uwUF_melt <- melt(as.matrix(Beta_uwUF.2)) %>%
+    filter(as.character(Var1) != as.character(Var2)) %>%
+    mutate_if(is.factor,as.character)
+
+colnames(reads_rare_norm_metadata.melt) = c("Var1", "Category1", "Sex1")
+wUF_melt = left_join(wUF_melt, reads_rare_norm_metadata.melt, by = "Var1")
+uwUF_melt = left_join(uwUF_melt, reads_rare_norm_metadata.melt, by = "Var1")
+
+colnames(reads_rare_norm_metadata.melt) = c("Var2", "Category2", "Sex2")
+wUF_melt = left_join(wUF_melt, reads_rare_norm_metadata.melt, by = "Var2")
+uwUF_melt = left_join(uwUF_melt, reads_rare_norm_metadata.melt, by = "Var2")
+```
+```{r}
+set.seed(765)
+
+wUF_melt.2 <- wUF_melt %>%
+  dplyr::filter(Category1 == Category2, Sex1 == Sex2) %>%
+  dplyr::mutate(Category = Category1, Sex = Sex1)
+# Issue cant use linaer models --> no normality in residuals 
+# I will use wilcoxen rank sum test
+wUF_melt_M<- wUF_melt.2 %>%
+  dplyr::filter(Sex =="M")
+wUF_melt_F<- wUF_melt.2 %>%
+  dplyr::filter(Sex =="F") 
+
+print("wUF M")
+wilcox.test(value ~ Category, data = wUF_melt_M, exact = FALSE, correct = FALSE)
+print("wUF F")
+wilcox.test(value ~ Category, data = wUF_melt_F, exact = FALSE, correct = FALSE)
+
+
+uwUF_melt.2 <- uwUF_melt %>%
+  dplyr::filter(Category1 == Category2, Sex1 == Sex2) %>%
+  dplyr::mutate(Category = Category1, Sex = Sex1)
+# Issue cant use linaer models --> no normality in residuals 
+# I will use wilcoxen rank sum test
+uwUF_melt_M<- uwUF_melt.2 %>%
+  dplyr::filter(Sex =="M") 
+uwUF_melt_F<- uwUF_melt.2 %>%
+  dplyr::filter(Sex =="F") 
+
+print("uwUF M")
+wilcox.test(value ~ Category, data = uwUF_melt_M, exact = FALSE, correct = FALSE)
+print("uwUF F")
+ wilcox.test(value ~ Category, data = uwUF_melt_F, exact = FALSE, correct = FALSE) 
+
+```
+```{r}
+Fig3_wUF <- wUF_melt.2 %>%
+  ggplot(aes(x = Category, y = value, fill=factor(Category))) +
+  theme_classic(base_size = 10) +
+  geom_boxplot(alpha =0.7, outlier.size = 0.3, outlier.alpha = 0.5) +
+  #facet_grid(~ Sex, scales = "free") +
+  scale_fill_manual(values=color_Category )+
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  labs(y = "weighted\nUniFrac distances")  +
+  theme(axis.text.x = element_text(face = "italic"), axis.title.x=element_blank())+
+  facet_grid(.~Sex)
+Fig3_wUF
+
+Fig3_uwUF <-uwUF_melt.2 %>%
+  ggplot(aes(x = Category, y = value, fill=factor(Category))) +
+  theme_classic(base_size = 10) +
+  geom_boxplot(alpha =0.7, outlier.size = 0.3, outlier.alpha = 0.5) +
+  #facet_grid(~ Sex, scales = "free") +
+  scale_fill_manual(values=color_Category )+
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  labs(y = "unweighted\nUniFrac distances")  +
+  theme(axis.text.x = element_text(face = "italic"), axis.title.x=element_blank())+
+  facet_grid(.~Sex)
+Fig3_uwUF
+```
+### Differential Abundance Analysis
+```{r eval =FLASE}
+gc()
+# median abundance C. minuta = 0.000101087 -> 0.01% 
+thresh_median <- 0.00001 #threshold median abundance (= median abundance C. minuta / 10)
+
+reads_rare.2 <- reads_rare %>%
+  tibble::rownames_to_column(var = "rowname") %>% 
+  tidyr::gather(var, value, -rowname) %>% 
+  tidyr::spread(rowname, value) 
+
+reads_rare.2[,2:183] <- as.data.table(lapply(reads_rare.2[,2:183], as.numeric))
+
+
+reads_rare_F<-reads_rare.2 %>%
+  dplyr::select(var, contains("fB")) %>%
+  dplyr::rename(rowname = var) %>%
+  dplyr::mutate_if(is.numeric,function(x) (x/sum(x))) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(median_abund = median(c_across(where(is.numeric)))) %>%
+  dplyr::filter(median_abund >= thresh_median) %>%
+  dplyr::select(-median_abund) %>%
+  tidyr::gather(var, value, -rowname) %>% 
+  tidyr::spread(rowname, value) %>% 
+  dplyr::rename(sampleid = var) %>%
+  dplyr::left_join(Metagenomics_metadata_CC, by ="sampleid") %>%
+  dplyr::left_join(metadata, by ="MouseID") %>%
+  dplyr::left_join(qPCR_data, by ="MouseID") %>%
+  dplyr::mutate(qPCR_16S_SQ_per_gCC = as.numeric(qPCR_16S_SQ_per_gCC))  %>%
+  dplyr::group_by(sampleid) %>%
+  dplyr::mutate_each(funs(.*qPCR_16S_SQ_per_gCC), starts_with("s__")) %>%
+  dplyr::ungroup() 
+
+Maaslin_metadata_F <- reads_rare_F %>%
+  dplyr::select(-contains("s__")) %>% 
+  tibble::column_to_rownames(var = "sampleid")
+
+Maaslin_reads_F <- reads_rare_F %>%
+  dplyr::select(sampleid, contains("s__")) %>%
+  tidyr::gather(var, value, -sampleid) %>% 
+  tidyr::spread(sampleid, value) %>%
+  dplyr::mutate_if(is.numeric, round) %>% 
+  tibble::column_to_rownames(var = "var")
+
+reads_rare_M<-reads_rare.2 %>%
+  dplyr::select(var, contains("mB")) %>%
+  dplyr::rename(rowname = var) %>%
+  dplyr::mutate_if(is.numeric,function(x) (x/sum(x))) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(median_abund = median(c_across(where(is.numeric)))) %>%
+  dplyr::filter(median_abund >= thresh_median) %>%
+  dplyr::select(-median_abund) %>%
+  tidyr::gather(var, value, -rowname) %>% 
+  tidyr::spread(rowname, value) %>% 
+  dplyr::rename(sampleid = var) %>%
+  dplyr::left_join(Metagenomics_metadata_CC, by ="sampleid") %>%
+  dplyr::left_join(metadata, by ="MouseID") %>%
+  dplyr::left_join(qPCR_data, by ="MouseID") %>%
+  dplyr::mutate(qPCR_16S_SQ_per_gCC = as.numeric(qPCR_16S_SQ_per_gCC))  %>%
+  dplyr::group_by(sampleid) %>%
+  dplyr::mutate_each(funs(.*qPCR_16S_SQ_per_gCC), starts_with("s__")) %>%
+  dplyr::ungroup()
+
+Maaslin_metadata_M  <- reads_rare_M %>%
+  dplyr::select(-contains("s__")) %>% 
+  tibble::column_to_rownames(var = "sampleid")
+
+Maaslin_reads_M <- reads_rare_M %>%
+  dplyr::select(sampleid, contains("s__")) %>%
+  tidyr::gather(var, value, -sampleid) %>% 
+  tidyr::spread(sampleid, value) %>%
+  dplyr::mutate_if(is.numeric, round) %>% 
+  tibble::column_to_rownames(var = "var")
+```
+```{r eval=FALSE}
+gc()
+options(backup_options)
+
+CM20_Maaslin_species_F_treat = Maaslin2(
+    input_data = Maaslin_reads_F, 
+    input_metadata = Maaslin_metadata_F, 
+    output = "./data/Interim_output/Maaslin_species_F_treat", 
+        fixed_effects = c("Category", "Run"), 
+    random_effects = c("Batch"),
+    reference= c("Run,R1-Hiseq"),
+    min_prevalence = 0.5, 
+    max_significance = 0.1, 
+    plot_scatter = FALSE, 
+    plot_heatmap = FALSE)
+
+CM20_Maaslin_species_M_treat = Maaslin2(
+    input_data = Maaslin_reads_M, 
+    input_metadata = Maaslin_metadata_M, 
+    output = "./data/Interim_output/Maaslin_species_M_treat", 
+        fixed_effects = c("Category", "Run"), 
+    random_effects = c("Batch"),
+    reference= c("Run,R1-Hiseq"),
+    min_prevalence = 0.5, 
+    max_significance = 0.1, 
+    plot_scatter = FALSE, 
+    plot_heatmap = FALSE)
+```
+```{r}
+Results_MaasLin_F <- fread("./data/Interim_output/Maaslin_species_F_treat/all_results.tsv") %>%
+  dplyr::filter(metadata == "Category") %>%
+  dplyr::mutate(qval = p.adjust(pval, method = "BH")) %>%
+  dplyr::arrange(qval) %>% 
+  dplyr::mutate(analysis = "F")
+Results_MaasLin_M <- fread("./data/Interim_output/Maaslin_species_M_treat/all_results.tsv") %>%
+  dplyr::filter(metadata == "Category") %>%
+  dplyr::mutate(qval = p.adjust(pval, method = "BH")) %>%
+  dplyr::arrange(qval) %>% 
+  dplyr::mutate(analysis = "M")
+
+sig_species_treat_F <- Results_MaasLin_F %>%
+  dplyr::filter(qval <= 0.1 & abs(coef) >= 1) %>%
+  pull(feature)
+sig_species_treat_M <- Results_MaasLin_M %>%
+  dplyr::filter(qval <= 0.1 & abs(coef) >= 1) %>%
+  pull(feature)
+
+sig_species_treat_combined <- unique(c(sig_species_treat_F, sig_species_treat_M)) 
+
+Results_MaasLin_Category_species_combined <- rbind(Results_MaasLin_F, Results_MaasLin_M) %>%
+  dplyr::filter(grepl(paste(sig_species_treat_combined, collapse="|"), feature)) %>%
+  dplyr::rename(var = feature) %>%
+  dplyr::mutate(var = properNames(var)) %>%
+  dplyr::left_join(Taxonomy, by ="var") %>%
+  tidyr::separate(taxonomy, into = tax_levels, sep =";") %>%
+  dplyr::select(-var, -OTU_ID) %>%
+  dplyr::mutate(Species = sub("s__", "", Species)) %>%
+  dplyr::mutate(Family = sub("f__", "", Family)) %>%
+  dplyr::mutate(stars = cut(qval, breaks=c(-Inf, 0.001, 0.01, 0.1, Inf), label=c("***", "**", "*", "")) )
+```
+```{r}
+Fig3_Maaslin.1<- Results_MaasLin_Category_species_combined %>% 
+  arrange(desc(Family), desc(Species)) %>%
+  mutate(Species = fct_inorder(factor(Species))) %>% 
+  ggplot(aes(x=analysis, y=Species, fill=coef), show.legend = T) + 
+  geom_tile() + 
+  scale_fill_gradient2(low="#D7191C", mid="white", high="#2C7BB6") + 
+  geom_text(aes(label=stars), color = "black", size=3) + 
+  labs(y=NULL, x=NULL, fill="coef") + 
+  theme_classic(base_size = 10) +
+  theme(legend.position = 'top')+
+  theme(axis.text.y = element_text(face = "italic")) +
+  theme(legend.key.height = unit(0.4, 'cm'), legend.key.width = unit(0.4, 'cm')) +
+  scale_y_discrete(position = "right")
+
+Fig3_Maaslin.2 <-  Results_MaasLin_Category_species_combined %>%
+  arrange(desc(Family), desc(Species)) %>%
+  mutate(Species = fct_inorder(factor(Species))) %>% 
+  ggplot(aes(y=Species, x=0.1, fill = Family)) +
+  scale_fill_manual(values = tableau_color_pal('Tableau 20')(19)) +
+  geom_tile() +
+  theme_void(base_size = 10) +
+  theme(legend.position = 'none')
+
+Fig3_Maaslin.legend <- cowplot::get_legend(Results_MaasLin_Category_species_combined %>%
+  arrange(desc(Family), desc(Species)) %>%
+  mutate(Species = fct_inorder(factor(Species))) %>% 
+  ggplot(aes(y=Species, x=0.1, fill = Family)) +
+  scale_fill_manual(values = tableau_color_pal('Tableau 20')(19)) +
+  geom_tile() +
+  theme_classic(base_size = 10) +
+  theme(legend.position = 'left') +
+  guides(fill=guide_legend(nrow=9, title.position="top")) + 
+  theme(legend.key.size = unit(0.4, 'cm'), 
+        legend.text=element_text(face = "italic")) +
+  guides(fill=guide_legend(nrow=5,byrow=TRUE)))
+```
+```{r}
+Fig3_Maaslin <- Fig3_Maaslin.2 + Fig3_Maaslin.1  + plot_layout(widths = c(0.3, 1))
+Fig3_Maaslin
+```
+### Figure 3 - C. minuta effects on gut microbiome biomass and diversity.
+```{r}
+Fig3_legend_treatment_sex <- cowplot::get_legend(metadata_Cmin %>% 
+  dplyr::mutate(Sex = ifelse(Sex == "F", "Female", "Male"), 
+                Category = ifelse(Category == "Killed", "Killed-CM", "Live-CM"), 
+                Sex_Category = paste(Sex, Category, sep = " ")) %>%
+  ggplot(aes(x = Category, y = qPCR_Cmin_per_gCC, shape = Sex_Category, color = Sex_Category)) + 
+  geom_point(aes(shape = Sex_Category, color= Sex_Category), alpha =0.7, size =0.5, show.legend = T) +
+  scale_shape_manual(values=c(16, 16,4, 4)) + 
+  scale_color_manual(values=c(color_Category, color_Category)) +
+  theme_classic(base_size = 10) +
+  theme(legend.title=element_blank()) + 
+  guides(shape=guide_legend(nrow=2, byrow=TRUE, 
+                            override.aes = list(size = 3, alpha = 1))))
+
+Fig3_align <- cowplot::align_plots(Fig3_qPCR_bacteria + theme(legend.position="none"),
+                                       Fig3_Cmin_biomass + theme(legend.position="none"),
+                                       Fig3_OF + theme(legend.position="none"),
+                                       Fig3_SE + theme(legend.position="none"),
+                                       Fig3_wUF + theme(legend.position="none"),
+                                       Fig3_uwUF + theme(legend.position="none"),
+                                       align = 'hv', axis = 'rlbt')
+
+Fig3_1 <- cowplot::plot_grid(Fig3_align[[1]],
+                               Fig3_align[[2]],
+                               Fig3_align[[3]],
+                               Fig3_align[[4]],
+                               Fig3_align[[5]],
+                               Fig3_align[[6]],
+                               ncol=2, nrow=3, labels = c( "A", "B", "C", "D", "E", "F"), label_size = 12, rel_widths = c(1, 1), rel_heights = c(1, 1, 1))
+
+Fig3_2 <- cowplot::plot_grid(Fig3_legend_treatment_sex,
+                               Fig3_Maaslin,
+                               Fig3_Maaslin.legend,
+                               ncol=1, nrow=3, labels = c(NA, "G", NA), label_size = 12, rel_heights = c(0.2, 1.5, 0.5))
+
+Figure3 <- cowplot::plot_grid(Fig3_1, 
+                               Fig3_2, 
+                               ncol=2, nrow=1, rel_widths = c(1.3, 1))
+```
+```{r fig.width=6.5, fig.height= 5.5}
+Figure3
+```
+```{r eval = FALSE}
+ggsave("./Figure3.pdf", plot = Figure3, device = cairo_pdf,  
+  width = 17 ,
+  height = 14,
+  units = "cm")
+```
+### Figure S4 - C. minuta amendment resulted in lower complexity in males.
+```{r}
+FigS4_barplot_legend <- cowplot::get_legend(FigS4_Taxa_barplot + theme(legend.position="bottom") )
+FigS4_legend_treatment_sex <- cowplot::get_legend(metadata_Cmin %>% 
+  dplyr::mutate(Sex = ifelse(Sex == "F", "Female", "Male"), 
+                Category = ifelse(Category == "Killed", "Killed-CM", "Live-CM"), 
+                Sex_Category = paste(Sex, Category, sep = " ")) %>%
+  ggplot(aes(x = Category, y = qPCR_Cmin_per_gCC, shape = Sex_Category, color = Sex_Category)) + 
+  geom_point(aes(shape = Sex_Category, color= Sex_Category), alpha =0.7, size =0.5, show.legend = T) +
+  scale_shape_manual(values=c(16, 16,4, 4)) + 
+  scale_color_manual(values=c(color_Category, color_Category)) +
+  theme_classic(base_size = 10) +
+  theme(legend.title=element_blank()) + 
+  guides(shape=guide_legend(override.aes = list(size = 3, alpha = 1))) +
+  theme(legend.position="bottom"))
+
+FigS4_align <- cowplot::align_plots(FigS4_FDP + theme(legend.position="none"),
+                                          FigS4_PE + theme(legend.position="none"),
+                                          align = 'v', axis = 'l')
+
+FigS4_1 <- cowplot::plot_grid(NA, 
+                                  FigS4_Taxa_barplot + theme(legend.position="none"),
+                                  ncol=2, nrow=1, rel_widths = c(0.1, 2),  labels = c( "A", NA), label_size = 12)
+
+FigS4_2 <- cowplot::plot_grid(FigS4_align[[1]],
+                                    FigS4_align[[2]],
+                                    ncol=2, nrow=1, rel_widths = c(1, 1),  labels = c("B","C"), label_size = 12)
+
+
+FigureS4 <- cowplot::plot_grid(FigS4_1, 
+                                  FigS4_barplot_legend,
+                                    FigS4_2, 
+                                  FigS4_legend_treatment_sex,
+                                    ncol=1, nrow=4, rel_heights = c(1.6, 0.35, 1, 0.2))
+```
+```{r fig.width=4, fig.height= 5}
+FigureS4
+```
+```{r eval = FALSE}
+ggsave("./FigureS4.pdf", plot = FigureS4, device = cairo_pdf,  
+  width = 10.5,
+  height = 13,
+  units = "cm")
+```
+## Amendment of C. minuta altered the host metabolome 
+### SCFA
+```{r}
+GCMS_SCFAs.2<- GCMS_SCFAs %>%
+  dplyr::left_join(metadata, by = "MouseID")
+
+Fig4_totalSCFA <- GCMS_SCFAs.2 %>% 
+  ggplot(aes(x = Category, y = Total_SCFA, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y= "Total SCFAs (mM/g)") +
+  theme(axis.text.x = element_text(face = "italic")) +
+  facet_grid(.~Sex) +
+  theme(strip.background = element_blank(),strip.text = element_blank()) 
+Fig4_totalSCFA
+```
+```{r}
+set.seed(501)
+GCMS_SCFAs.2$Total_SCFA_norm <- predict(bestNormalize(GCMS_SCFAs.2$Total_SCFA))
+
+options(contrasts=c("contr.sum", "contr.poly"))
+model_scfa<- lmer(Total_SCFA_norm ~ Category*Sex + Extraction_round + (Category|Sex/Batch) + (Category|Batch) + (1|Deriv), data = GCMS_SCFAs.2)
+step(model_scfa)
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_scfa.2<- lm(Total_SCFA_norm ~ Category + Sex + Extraction_round + Category:Sex, data = GCMS_SCFAs.2)
+shapiro.test(residuals(model_scfa.2))
+anova(lm(residuals(model_scfa.2)~fitted.values(model_scfa.2)))
+```
+```{r}
+par(mfrow=c(2,2))
+plot(model_scfa.2)
+```
+```{r}
+GCMS_SCFAs_M <- GCMS_SCFAs.2 %>% dplyr::filter(Sex =="M")
+GCMS_SCFAs_F <- GCMS_SCFAs.2 %>% dplyr::filter(Sex =="F")
+
+model_scfa_m <- lm(Total_SCFA_norm ~ Category + Extraction_round, data = GCMS_SCFAs_M)
+model_scfa_f <- lm(Total_SCFA_norm ~ Category + Extraction_round, data = GCMS_SCFAs_F)
+
+shapiro.test(residuals(model_scfa_m))
+shapiro.test(residuals(model_scfa_f))
+
+anova(lm(residuals(model_scfa_m)~fitted.values(model_scfa_m)))
+anova(lm(residuals(model_scfa_f)~fitted.values(model_scfa_f)))
+
+car::Anova(model_scfa_m, test.statistic="F", type = "II")
+car::Anova(model_scfa_f, test.statistic="F", type = "II")
+
+model_scfa_meff <- lm(Total_SCFA ~ Category + Extraction_round, data = GCMS_SCFAs_M)
+model_scfa_feff <- lm(Total_SCFA ~ Category + Extraction_round, data = GCMS_SCFAs_F)
+
+effects::effect("Category", model_scfa_meff, se=TRUE) %>% as.data.frame
+effects::effect("Category", model_scfa_feff, se=TRUE) %>% as.data.frame
+```
+```{r eval = FALSE}
+SCFA_F <- GCMS_SCFAs.2 %>% 
+  dplyr::filter(Sex =="F") %>%
+  dplyr::select(MouseID, Acetate:Caproate, Propionate:Valerate) %>%
+  tibble::column_to_rownames(var = "MouseID") 
+
+SCFA_M <- GCMS_SCFAs.2 %>% 
+  dplyr::filter(Sex =="M") %>%
+  dplyr::select(MouseID, Acetate:Caproate, Propionate:Valerate) %>%
+  tibble::column_to_rownames(var = "MouseID") 
+
+SCFA_F_meta <- GCMS_SCFAs.2 %>% 
+  dplyr::filter(Sex =="F") %>%
+  tibble::column_to_rownames(var = "MouseID") 
+
+SCFA_M_meta <- GCMS_SCFAs.2 %>% 
+  dplyr::filter(Sex =="M") %>%
+  tibble::column_to_rownames(var = "MouseID") 
+
+options(backup_options)
+
+SCFA_F = Maaslin2(
+    input_data = SCFA_F, 
+    input_metadata = SCFA_F_meta, 
+    output = "./data/Interim_output/SCFA_F", 
+    fixed_effects = c("Category", "Extraction_round"),
+    reference = c("Extraction_round,E1"),
+    random_effects = c("Batch"), 
+    min_prevalence = FALSE,
+    min_abundance = FALSE,
+    min_variance = FALSE, 
+    analysis_method = "LM", 
+    max_significance = 0.1)
+
+SCFA_M = Maaslin2(
+    input_data = SCFA_M, 
+    input_metadata = SCFA_M_meta, 
+    output = "./data/Interim_output/SCFA_M", 
+    fixed_effects = c("Category", "Extraction_round"), 
+    reference = c("Extraction_round,E1"),
+    random_effects = c("Batch"), 
+    min_prevalence = FALSE,
+    min_abundance = FALSE,
+    min_variance = FALSE,
+    max_significance = 0.1)
+```
+```{r}
+SCFA_F_results <- fread("./data/Interim_output/SCFA_F/all_results.tsv")
+SCFA_M_results <-fread("./data/Interim_output/SCFA_M/all_results.tsv")
+```
+```{r}
+SCFA_F_treat <- SCFA_F_results %>%
+  dplyr::filter(metadata == "Category") %>%
+  dplyr::mutate(qval2 = p.adjust(pval, method= "BH")) %>%
+  dplyr::arrange(qval2)
+
+SCFA_M_treat <-SCFA_M_results %>%
+  dplyr::filter(metadata == "Category") %>%
+  dplyr::mutate(qval2 = p.adjust(pval, method= "BH")) %>%
+  dplyr::arrange(qval2) 
+```
+```{r}
+SCFA_F_treat
+SCFA_M_treat
+```
+```{r}
+Fig4_butyrate <- GCMS_SCFAs.2 %>%
+  ggplot(aes(x = Category, y = Butyrate, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y= "Butyrate (mM/g)") +
+  theme(axis.text.x = element_text(face = "italic")) +
+  facet_grid(.~Sex) +
+  theme(strip.background = element_blank(),strip.text = element_blank()) 
+Fig4_butyrate
+
+FigS5_SCFAs <- GCMS_SCFAs.2 %>%
+  dplyr::mutate(Sex_Category =paste (Sex, Category, sep ="_")) %>%
+  dplyr::select(Category,Sex_Category, Batch, Sex, Acetate, Propionate, Valerate, Caproate) %>%
+  tidyr::gather(SCFA, measurement, c(Acetate:Caproate)) %>%
+  ggplot(aes(x = Category, y = measurement, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "K", "Live" = "L")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Conc. (mM/g)") +
+  theme(axis.title.x=element_blank()) +
+  ggh4x::facet_nested_wrap(~ SCFA + Sex, scales ="free_y",ncol =4, labeller=function(x) {x[1]}) +
+  theme(legend.position="bottom") +
+  theme(axis.text.x = element_text(face = "italic")) +
+  theme(strip.background = element_blank())
+FigS5_SCFAs
+```
+
+
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+
+set.seed(193)
+
+SCFA_activity <- Promethion_activity %>%
+  dplyr::select(MouseID, Distance_traveled, Beam_breaks, Promethion_Cabinet) %>% 
+  dplyr::left_join(GCMS_SCFAs.2, by ="MouseID") %>% 
+  drop_na(Distance_traveled, Total_SCFA) %>%
+  dplyr::mutate(Distance_traveled_norm = predict(bestNormalize::boxcox(Distance_traveled)), 
+                Beam_breaks_norm = predict(bestNormalize(Beam_breaks)), 
+                Total_SCFA_norm = predict(bestNormalize(Total_SCFA)), 
+                Butyrate_norm = predict(bestNormalize(Butyrate)))
+```
+```{r}
+model_scfa_dist <- lmerTest::lmer(Distance_traveled_norm ~ Total_SCFA_norm*Extraction_round*Sex  + (1|Batch), data = SCFA_activity)
+lmerTest::step(model_scfa_dist)
+
+model_scfa_bb <- lmerTest::lmer(Beam_breaks_norm ~ Total_SCFA_norm*Extraction_round*Sex  + (1|Batch), data = SCFA_activity)
+lmerTest::step(model_scfa_bb)
+
+model_ba_dist <- lmerTest::lmer(Distance_traveled_norm ~ Butyrate_norm*Extraction_round*Sex  + (1|Batch), data = SCFA_activity)
+lmerTest::step(model_ba_dist)
+
+model_ba_bb<- lmerTest::lmer(Beam_breaks_norm ~ Butyrate_norm*Extraction_round*Sex  + (1|Batch), data = SCFA_activity)
+lmerTest::step(model_ba_bb)
+```
+-> Only total SCFA correlate to activity. Butyrate doesnt. 
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+
+model_scfa_dis.2 <- lmerTest::lmer(Distance_traveled_norm ~ Total_SCFA_norm + Sex + (1 | Batch), data = SCFA_activity)
+shapiro.test(residuals(model_scfa_dis.2))
+anova(lm(residuals(model_scfa_dis.2)~fitted.values(model_scfa_dis.2)))
+
+model_scfa_bb.2 <- lmerTest::lmer(Beam_breaks_norm ~ Total_SCFA_norm + Sex + (1 | Batch), data = SCFA_activity)
+shapiro.test(residuals(model_scfa_bb.2))
+anova(lm(residuals(model_scfa_bb.2)~fitted.values(model_scfa_bb.2)))
+
+model_ba_dist.2 <- lmerTest::lmer(Distance_traveled_norm ~ Butyrate_norm + Sex + (1 | Batch), data = SCFA_activity)
+shapiro.test(residuals(model_ba_dist.2))
+anova(lm(residuals(model_ba_dist.2)~fitted.values(model_ba_dist.2)))
+
+model_ba_bb.2 <- lmerTest::lmer(Beam_breaks_norm ~ Butyrate_norm + Sex + (1 | Batch), data = SCFA_activity)
+shapiro.test(residuals(model_ba_bb.2))
+anova(lm(residuals(model_ba_bb.2)~fitted.values(model_ba_bb.2)))
+```
+```{r}
+plot(model_scfa_dis.2)
+plot(model_scfa_bb.2)
+
+plot(model_ba_dist.2)
+plot(model_ba_bb.2)
+```
+```{r}
+car::Anova(model_scfa_dis.2, test.statistic ="F", type ="II")
+car::Anova(model_scfa_bb.2, test.statistic ="F", type ="II")
+car::Anova(model_ba_dist.2, test.statistic ="F", type ="II")
+car::Anova(model_ba_bb.2, test.statistic ="F", type ="II")
+```
+```{r}
+set.seed(763)
+r2_model_scfa_dis_mar<- partR2(model_scfa_dis.2, partvars = c("Total_SCFA_norm"), R2_type = "marginal", nboot = 10)
+r2_model_scfa_dis_mar$R2 %>% dplyr::filter(term == "Total_SCFA_norm") %>% dplyr::select(estimate) %>% pull()
+
+r2_model_scfa_bb_mar <- partR2(model_scfa_bb.2, partvars = c("Total_SCFA_norm"), R2_type = "marginal", nboot = 10)
+r2_model_scfa_bb_mar$R2 %>% dplyr::filter(term == "Total_SCFA_norm") %>% dplyr::select(estimate) %>% pull()
+
+r2_model_ba_dist_mar<- partR2(model_ba_dist.2, partvars = c("Butyrate_norm"), R2_type = "marginal", nboot = 10)
+r2_model_ba_dist_mar$R2 %>% dplyr::filter(term == "Butyrate_norm") %>% dplyr::select(estimate) %>% pull()
+
+r2_model_ba_bb_mar<- partR2(model_ba_bb.2, partvars = c("Butyrate_norm"), R2_type = "marginal", nboot = 10)
+r2_model_ba_bb_mar$R2 %>% dplyr::filter(term == "Butyrate_norm") %>% dplyr::select(estimate) %>% pull()
+
+
+#residuals
+model_ba_scfa_dist_resid <- lmerTest::lmer(Distance_traveled_norm ~  Sex + (1 | Batch), data = SCFA_activity)
+model_ba_scfa_bb_resid <- lmerTest::lmer(Beam_breaks_norm ~ Sex + (1 | Batch), data = SCFA_activity)
+
+SCFA_activity <- SCFA_activity %>%
+  dplyr::mutate(Distance_traveled_resid = residuals(model_ba_scfa_dist_resid)/sigma(model_ba_scfa_dist_resid), 
+                Beam_breaks_resid = residuals(model_ba_scfa_bb_resid)/sigma(model_ba_scfa_bb_resid))
+```
+```{r}
+Fig4_tscfa_distance <- SCFA_activity %>%
+  ggplot(aes(x= Total_SCFA_norm ,y=Distance_traveled_resid)) +
+  geom_point(aes(shape = Sex, color = Category), alpha =0.7, size =0.6, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color = "black")+ 
+  theme_classic(base_size = 10) +
+  labs(y= "Adj. distance traveled", x = "Norm. total SCFAs")
+Fig4_tscfa_distance
+
+FigS5_butyrate_beambreaks<- SCFA_activity%>%
+  ggplot(aes(x= Butyrate_norm ,y=Beam_breaks_resid)) +
+  geom_point(aes(shape = Sex, color = Category), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color = "black")+ 
+  theme_classic(base_size = 10) +
+  labs(y= "Adj. beam breaks", x = "Norm. butyrate")
+FigS5_butyrate_beambreaks
+
+FigS5_tscfa_beambreaks <- SCFA_activity%>%
+  ggplot(aes(x= Total_SCFA_norm ,y=Beam_breaks_resid)) +
+  geom_point(aes(shape = Sex, color = Category), alpha =0.7, size =0.6, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color = "black")+ 
+  theme_classic(base_size = 10) +
+  labs(y= "Adj. beam breaks", x = "Norm. total SCFA")
+FigS5_tscfa_beambreaks
+
+Fig4_butyrate_distance <- SCFA_activity %>%
+  ggplot(aes(x= Butyrate_norm ,y=Distance_traveled_resid)) +
+  geom_point(aes(shape = Sex, color = Category), alpha =0.7, size =0.6, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_Category, label = c(expression(italic("Killed-CM")), expression(italic("Live-CM"))), name = "Treatment") +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color = "black")+ 
+  theme_classic(base_size = 10) +
+  labs(y= "Adj. distance traveled", x = "Norm. butyrate") 
+Fig4_butyrate_distance
+```
+### targeted serum metabolites (LC_MS)
+```{r}
+LCMS_serum.2 <- LCMS_serum %>%
+  dplyr::filter(Sampletype == "Sample") %>%
+  dplyr::mutate(GluA_Glu_ratio = Glutamic_acid/Glutamine) %>%
+  tidyr::separate(sampleid, sep ="_", into = c("Metabolomics_Run", NA, NA), remove = FALSE) %>%
+  dplyr::left_join(metadata, by ="MouseID")%>%
+  dplyr::select(-Cortisol) # signal too weak
+```
+```{r fig.width=7, fig.height= 5}
+LCMS_serum.2 %>%
+  tidyr::gather(molecule, conc_area, Corticosterone:GABA) %>%
+  dplyr::mutate(Sex_Category = paste(Sex, Category, sep = "_")) %>%
+  ggplot(aes(x=	Sex_Category ,y= conc_area, fill=factor(Category))) +
+  geom_boxplot(alpha =0.7, outlier.shape = NA) + 
+  scale_fill_manual(values=color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  labs(fill = "Category") + 
+  geom_point(alpha =0.7, size =0.5, position=position_jitterdodge(jitter.width=0.7),
+             show.legend = T) +
+  theme_classic(base_size = 11) + 
+  theme(axis.title.x=element_blank()) +
+  theme(legend.position="bottom") +
+  scale_y_continuous(labels = function(x) format(x, scientific = TRUE)) +
+  facet_wrap(molecule~., scales = "free", ncol = 4) +
+  scale_x_discrete(labels=c("F\nKilled-\nCM", "F\nLive-\nCM", "M\nKilled-\nCM", "M\nLive-\nCM")) 
+```
+```{r eval=FALSE}
+LCMS_serum_F <- LCMS_serum.2 %>%
+  dplyr::filter(Sex == "F")
+LCMS_serum_M <- LCMS_serum.2 %>%
+  dplyr::filter(Sex == "M")
+
+LCMS_serum_F_metabolites <- LCMS_serum_F %>%
+  dplyr::select(sampleid, Corticosterone:GABA) %>%
+  tibble::column_to_rownames(var ="sampleid")
+
+LCMS_serum_M_metabolites <- LCMS_serum_M %>%
+  dplyr::select(sampleid, Corticosterone:GABA) %>%
+  tibble::column_to_rownames(var ="sampleid")
+
+LCMS_serum_F_metadata <- LCMS_serum_F %>%
+  dplyr::select(sampleid, MouseID, Metabolomics_Run, Batch, Category) %>%
+  tibble::column_to_rownames(var ="sampleid")
+
+LCMS_serum_M_metadata <- LCMS_serum_M %>%
+  dplyr::select(sampleid, MouseID, Metabolomics_Run, Batch, Category) %>%
+  tibble::column_to_rownames(var ="sampleid")
+
+options(backup_options)
+
+Maaslin_LCMS_F = Maaslin2(
+    input_data = LCMS_serum_F_metabolites, 
+    input_metadata = LCMS_serum_F_metadata, 
+    output = "./data/Interim_output/Maaslin_LCMS_F", 
+    fixed_effects = c("Category", "Metabolomics_Run"), 
+    random_effects = c("Batch"), 
+    min_prevalence = 0.7, 
+    max_significance = 0.15)
+Maaslin_LCMS_M = Maaslin2(
+    input_data = LCMS_serum_M_metabolites, 
+    input_metadata = LCMS_serum_M_metadata, 
+    output = "./data/Interim_output/Maaslin_LCMS_M", 
+    fixed_effects = c("Category", "Metabolomics_Run"), 
+    random_effects = c("Batch"), 
+    min_prevalence = 0.7, 
+    max_significance = 0.15)
+```
+```{r}
+Maaslin_LCMS_F_results <- fread("./data/Interim_output/Maaslin_LCMS_F/all_results.tsv")
+Maaslin_LCMS_M_results <- fread("./data/Interim_output/Maaslin_LCMS_M/all_results.tsv")
+
+Maaslin_LCMS_F_results.2 <- Maaslin_LCMS_F_results %>%
+  dplyr::filter(metadata == "Category") %>%
+  dplyr::mutate(qval2 = p.adjust(pval, method = "BH")) %>%
+  dplyr::arrange(qval2) 
+Maaslin_LCMS_F_results.2
+
+Maaslin_LCMS_M_results.2 <-Maaslin_LCMS_M_results %>%
+  dplyr::filter(metadata == "Category") %>%
+  dplyr::mutate(qval2 = p.adjust(pval, method = "BH")) %>%
+  dplyr::arrange(qval2) 
+Maaslin_LCMS_M_results.2
+```
+```{r}
+Fig4_Corticosterone <- LCMS_serum.2 %>% 
+  dplyr::mutate(Corticosterone_10x4 = Corticosterone/10000) %>%
+  ggplot(aes(x = Category, y = Corticosterone_10x4, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "Killed-\nCM", "Live" = "Live-\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y ="Corticosterone\n(PA) x e4") +
+  theme(axis.text.x = element_text(face = "italic")) +
+  facet_grid(.~Sex , scales ="free") +
+  theme(strip.background = element_blank(),strip.text = element_blank()) 
+Fig4_Corticosterone
+
+FigS5_LCMS <- LCMS_serum.2 %>% 
+  dplyr::mutate(Sex_Category =paste (Sex, Category, sep ="_")) %>%
+  dplyr::select(Category, Sex_Category, Batch, Sex, Glutamic_acid, Glutamine, Histamine, Indolelactic_acid, Kynurenine, Thyroxine, Serotonin, Tryptophan, Kynurenic_acid, GABA) %>%
+  dplyr::rename(Glu = Glutamic_acid, Gln = Glutamine, ILA = Indolelactic_acid, KYN = Kynurenine, T4 = Thyroxine, KYNA = Kynurenic_acid) %>% 
+  tidyr::gather(metabolite, measurement, c(Glu:GABA)) %>%
+  dplyr::mutate(measurement = as.numeric(measurement)) %>%
+  dplyr::mutate(measurement_10x4 = measurement/10000) %>%
+  ggplot(aes(x = Category, y = measurement_10x4, shape = Sex, color = Category)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_Category, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Killed" = "K", "Live" = "L")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = expression(paste("(PA/ml) x ", e^4))) +
+  theme(axis.title.x=element_blank()) +
+  ggh4x::facet_nested_wrap(~ metabolite + Sex, scales ="free_y", ncol =10, labeller=function(x) {x[1]}) +
+  theme(legend.position="bottom") +
+  theme(axis.text.x = element_text(face = "italic")) +
+  theme(strip.background = element_blank())
+FigS5_LCMS
+```
+
+
+### untargeted serum metabolites (LC_MS)
+```{r eval=FALSE}
+Maaslin_ee <- Promethion_activity_ee.2_MF %>%
+  dplyr::select(MouseID, EE_average_per_hour_residual) 
+
+Maaslin_metadata <- LCMS_serum.2 %>% dplyr::select(sampleid, MouseID, Category, Sex, Batch, Metabolomics_Run)
+
+xcms_peaklist <- LCMS_xcms_output %>%
+  dplyr::select(mzmed, rtmed, R3_S11_6456:R3_S9_6438, R1_S13_5916:R1_S9_6189) %>% 
+  dplyr::mutate(Sample = paste(mzmed, rtmed, sep ="/")) %>%
+  dplyr::select(Sample, R3_S11_6456:R1_S9_6189, -R3_S37_6420) 
+
+
+xcms_metadata <- xcms_peaklist %>% 
+  tidyr::gather(var, value, -Sample) %>% 
+  tidyr::spread(Sample, value) %>%
+  dplyr::rename(sampleid = var) %>%
+  dplyr::select(sampleid) %>%
+  dplyr::left_join(Maaslin_metadata, by ="sampleid") %>%
+  dplyr::left_join(Maaslin_ee, by ="MouseID") %>%
+  dplyr::select(sampleid, Category, Sex, Batch, EE_average_per_hour_residual, Metabolomics_Run) 
+
+xcms_metadata_F <- xcms_metadata %>% 
+  dplyr::filter(Sex == "F")
+xcms_metadata_M <- xcms_metadata %>% 
+  dplyr::filter(Sex == "M")
+
+females <- xcms_metadata_F %>% pull(sampleid)
+males <- xcms_metadata_M %>% pull(sampleid)
+
+xcms_peaklist_F <- xcms_peaklist %>% 
+  dplyr::select(Sample, contains(females)) %>%
+  dplyr::rename(sampleid = Sample)
+xcms_peaklist_M <-xcms_peaklist %>% 
+  dplyr::select(Sample, contains(males))%>%
+  dplyr::rename(sampleid = Sample)
+
+xcms_peaklist_F2 <- xcms_peaklist_F %>%
+  dplyr::mutate(sampleid = sub('/', '_rt', sampleid)) %>%
+  dplyr::mutate(sampleid = paste("mz", sampleid, sep = "")) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(row_mean = mean(R1_S10_6303:R3_S9_6438)) %>% # create a row with mean intensity of peak
+  dplyr::ungroup() %>% 
+  dplyr::slice_max(row_mean, n = 5000) %>% # select top 5000 peaks according to mean intensity
+  dplyr::select(-row_mean) %>%
+  column_to_rownames(var = "sampleid") %>%
+  dplyr::select(sort(names(.)))
+xcms_metadata_F2 <- xcms_metadata_F %>%
+  dplyr::arrange(sampleid) %>%
+  column_to_rownames(var = "sampleid")
+
+xcms_peaklist_M2 <- xcms_peaklist_M %>%
+  dplyr::mutate(sampleid = sub('/', '_rt', sampleid)) %>%
+  dplyr::mutate(sampleid = paste("mz", sampleid, sep = "")) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(row_mean = mean(R1_S1_6342:R3_S8_6382)) %>% # create a row with mean intensity of peak
+  dplyr::ungroup() %>% 
+  dplyr::slice_max(row_mean, n = 5000) %>% # select top 5000 peaks according to mean intensity
+  dplyr::select(-row_mean) %>%
+  column_to_rownames(var = "sampleid") %>%
+  dplyr::select(sort(names(.)))
+xcms_metadata_M2 <- xcms_metadata_M %>%
+  dplyr::arrange(sampleid) %>%
+  column_to_rownames(var = "sampleid")
+
+options(backup_options)
+
+Xcms_Maaslin_F = Maaslin2(
+    input_data = xcms_peaklist_F2, 
+    input_metadata = xcms_metadata_F2, 
+    output = "./data/Interim_output/Xcms_Maaslin_F", 
+    fixed_effects = c("Category", "Metabolomics_Run"), 
+    random_effects = c("Batch"), 
+    min_prevalence = 0.7, 
+    max_significance = 0.1, 
+    plot_heatmap = FALSE, 
+    plot_scatter = FALSE)
+
+Xcms_Maaslin_M = Maaslin2(
+    input_data = xcms_peaklist_M2, 
+    input_metadata = xcms_metadata_M2, 
+    output = "./data/Interim_output/Xcms_Maaslin_M", 
+    fixed_effects = c("Category", "Metabolomics_Run"), 
+    random_effects = c("Batch"), 
+    min_prevalence = 0.7, 
+    max_significance = 0.1, 
+    plot_heatmap = FALSE, 
+    plot_scatter = FALSE)
+
+Xcms_Maaslin_F_EE = Maaslin2(
+    input_data = xcms_peaklist_F2, 
+    input_metadata = xcms_metadata_F2, 
+    output = "./data/Interim_output/Xcms_Maaslin_F_EE", 
+    fixed_effects = c("EE_average_per_hour_residual", "Metabolomics_Run"), 
+    random_effects = c("Batch"), 
+    min_prevalence = 0.7, 
+    max_significance = 0.1, 
+    plot_heatmap = FALSE, 
+    plot_scatter = FALSE)
+
+Xcms_Maaslin_M_EE = Maaslin2(
+    input_data = xcms_peaklist_M2, 
+    input_metadata = xcms_metadata_M2, 
+    output = "./data/Interim_output/Xcms_Maaslin_M_EE", 
+    fixed_effects = c("EE_average_per_hour_residual", "Metabolomics_Run"), 
+    random_effects = c("Batch"), 
+    min_prevalence = 0.7, 
+    max_significance = 0.1, 
+    plot_heatmap = FALSE, 
+    plot_scatter = FALSE)
+```
+```{r eval=FALSE}
+Xcms_Maaslin_F_results<- fread("./data/Interim_output/Xcms_Maaslin_F/all_results.tsv")
+Xcms_Maaslin_M_results<- fread("./data/Interim_output/Xcms_Maaslin_M/all_results.tsv")
+
+Xcms_Maaslin_F_EE_results<- fread("./data/Interim_output/Xcms_Maaslin_F_EE/all_results.tsv")
+Xcms_Maaslin_M_EE_results<- fread("./data/Interim_output/Xcms_Maaslin_M_EE/all_results.tsv")
+```
+```{r eval=FALSE}
+#Treatment
+Xcms_Maaslin_F_stats <-Xcms_Maaslin_F_results %>% 
+  as.data.frame() %>%
+  dplyr::filter(metadata == "Category") %>%
+  dplyr::mutate(t.score = coef/stderr) %>% 
+  tidyr::separate(feature, sep = "_rt", into = c("m.z", "r.t")) %>%
+  dplyr::mutate(m.z = sub("mz", "", m.z)) %>%
+  dplyr::mutate(qval2 = p.adjust(pval, method = "BH")) %>%
+  dplyr::rename(p.value = qval2) %>%
+  dplyr::arrange(p.value) %>%
+  dplyr::select(m.z, r.t, p.value, t.score)
+
+Xcms_Maaslin_M_stats <-Xcms_Maaslin_M_results %>% 
+  as.data.frame() %>%
+  dplyr::filter(metadata == "Category") %>%
+  dplyr::mutate(t.score = coef/stderr) %>% 
+  tidyr::separate(feature, sep = "_rt", into = c("m.z", "r.t")) %>%
+  dplyr::mutate(m.z = sub("mz", "", m.z)) %>%
+  dplyr::mutate(qval2 = p.adjust(pval, method = "BH")) %>%
+  dplyr::rename(p.value = qval2) %>%
+  dplyr::arrange(p.value) %>%
+  dplyr::select(m.z, r.t, p.value, t.score)
+
+#EE
+Xcms_Maaslin_F_EE_stats <-Xcms_Maaslin_F_EE_results %>% 
+  as.data.frame() %>%
+  dplyr::filter(metadata == "EE_average_per_hour_residual") %>%
+  dplyr::mutate(t.score = coef/stderr) %>% 
+  tidyr::separate(feature, sep = "_rt", into = c("m.z", "r.t")) %>%
+  dplyr::mutate(m.z = sub("mz", "", m.z)) %>%
+  dplyr::mutate(qval2 = p.adjust(pval, method = "BH")) %>%
+  dplyr::rename(p.value = qval2) %>%
+  dplyr::arrange(p.value) %>%
+  dplyr::select(m.z, r.t, p.value, t.score)
+
+Xcms_Maaslin_M_EE_stats <-Xcms_Maaslin_M_EE_results %>% 
+  as.data.frame() %>%
+  dplyr::filter(metadata == "EE_average_per_hour_residual") %>%
+  dplyr::mutate(t.score = coef/stderr) %>% 
+  tidyr::separate(feature, sep = "_rt", into = c("m.z", "r.t")) %>%
+  dplyr::mutate(m.z = sub("mz", "", m.z)) %>%
+  dplyr::mutate(qval2 = p.adjust(pval, method = "BH")) %>%
+  dplyr::rename(p.value = qval2) %>%
+  dplyr::arrange(p.value) %>%
+  dplyr::select(m.z, r.t, p.value, t.score)
+```
+```{r eval=FALSE}
+write.table(Xcms_Maaslin_F_stats, file = "./data/Interim_output/Xcms_Maaslin_F_stats.txt", sep = "," ,row.names = FALSE, quote = FALSE)
+write.table(Xcms_Maaslin_M_stats, file = "./data/Interim_output/Xcms_Maaslin_M_stats.txt", sep = "," ,row.names = FALSE, quote = FALSE)
+
+write.table(Xcms_Maaslin_F_EE_stats, file = "./data/Interim_output/Xcms_Maaslin_F_EE_stats.txt", sep = "," ,row.names = FALSE, quote = FALSE)
+write.table(Xcms_Maaslin_M_EE_stats, file = "./data/Interim_output/Xcms_Maaslin_M_EE_stats.txt", sep = "," ,row.names = FALSE, quote = FALSE)
+```
+MetaboAnalyst Output
+```{r}
+MA_int_F_EE <- fread("./data/Metabolomics/metaboanalyst/MetaboAnalyst_F_EE/mummichog_integ_pathway_enrichment.csv")
+MA_gsea_F_EE <- fread("./data/Metabolomics/metaboanalyst/MetaboAnalyst_F_EE/mummichog_fgsea_pathway_enrichment.csv")
+
+#Females
+MA_gsea_F_CM.2 <- MA_gsea_F_EE %>%
+  dplyr::rename(Pathway = V1)%>%
+  dplyr::select(Pathway, NES) 
+
+MA_int_F_EE.2 <- MA_int_F_EE %>% 
+  dplyr::rename(Pathway = V1)%>%
+  dplyr::select(Pathway, Combined_Pvals) %>%
+  dplyr::filter(Combined_Pvals <= 0.05) %>%
+  dplyr::left_join(MA_gsea_F_CM.2, by = "Pathway") %>%
+  dplyr::arrange(-NES) %>%
+  dplyr::mutate(analysis = "F")%>%
+  dplyr::mutate(variable = "EE")
+
+Fig4_F_EE_pathway <- MA_int_F_EE.2 %>% 
+  dplyr::arrange(NES) %>% 
+  dplyr::mutate(Pathway = factor(Pathway, levels = Pathway)) %>% 
+  ggplot(aes(y = NES, x = Pathway, fill = Combined_Pvals)) +
+  geom_bar(stat = "identity") +
+  theme_classic(base_size = 10) +
+  scale_fill_gradient(high = "#fed799", low = "#b73779", na.value = NA, name = "Combined\np-value") + 
+  coord_flip() +
+  ggtitle("F - EE")+ 
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(axis.title.y=element_blank()) +
+  theme(legend.position = 'right') +
+   theme(
+        legend.key.height = unit(0.5, 'cm'), 
+        legend.key.width = unit(0.5, 'cm')) 
+Fig4_F_EE_pathway 
+```
+### Fig. 4 - Changes of metabolism in relation to activity and energy expenditure. 
+```{r}
+Fig4_align <- cowplot::align_plots(Fig4_totalSCFA + theme(legend.position="none"),
+                                      Fig4_tscfa_distance + theme(legend.position="none"),
+                                      Fig4_butyrate+ theme(legend.position="none"),
+                                      Fig4_butyrate_distance + theme(legend.position="none"),
+                                      Fig4_Corticosterone+ theme(legend.position="none"),
+                                      align = 'v', axis = 'l')
+
+
+Fig4_1 <- cowplot::plot_grid(Fig4_align[[1]],
+                                  Fig4_align[[3]],
+                                  Fig4_align[[2]],
+                                Fig4_align[[4]],
+                                  ncol=4, nrow=1, labels = c("A", "B", "C", "D"),label_size = 12, rel_widths = c(2, 2,1.8, 1.8))
+
+Fig4_2 <- cowplot::plot_grid(Fig4_align[[5]],
+                                  Fig4_F_EE_pathway,
+                                Legend_treatment_sex, 
+                                  ncol=3, nrow=1, labels = c( "E", "F", NA),label_size = 12, rel_widths = c(2, 4.2, 1.4))
+
+
+Figure4 <- cowplot::plot_grid(NA, 
+                                 Fig4_1, 
+                             Fig4_2,
+                             ncol=1, nrow = 3, rel_heights = c(0.1, 1,1))
+```
+```{r fig.width=6.5, fig.height= 4}
+Figure4
+```
+```{r eval = FALSE}
+ggsave("./Figure4.pdf", plot = Figure4, device = cairo_pdf,  
+  width = 17,
+  height = 10.5,
+  units = "cm")
+```
+### Fig. S5 - Candidate metabolites assessed in cecal contents and serum samples.
+```{r}
+FigS5_align <- cowplot::align_plots(FigS5_SCFAs + theme(legend.position="none"),
+                                         FigS5_tscfa_beambreaks + theme(legend.position="none"),
+                                         FigS5_butyrate_beambreaks+ theme(legend.position="none"),
+                                         FigS5_LCMS + theme(legend.position="none"),
+                                         align = 'v', axis = 'l')
+
+FigS5_1 <- cowplot::plot_grid(FigS5_align[[2]], 
+                                   FigS5_align[[3]], 
+                                   ncol = 2, nrow=1, labels = c("B", "C"), label_size = 12, rel_widths = c(1,1))
+
+FigS5_2 <- cowplot::plot_grid(FigS5_1,
+                                Fig3_legend_treatment_sex,
+                                   ncol = 1, nrow=2, rel_heights = c(1,0.5))
+
+FigS5_3<- cowplot::plot_grid(FigS5_align[[1]], 
+                                FigS5_2,
+                                   ncol = 2, nrow=1, labels = c("A", NA), label_size = 12, rel_widths = c(1, 1))
+
+FigureS5 <- cowplot::plot_grid(NA,
+                                  FigS5_3, 
+                                  NA,
+                                  FigS5_align[[4]],
+                                   ncol = 1, nrow=5, labels = c(NA, "A", NA, "D"),label_size = 12, rel_heights = c(0.1,1, 0.1, 1))
+```
+```{r fig.width=6.5, fig.height= 7}
+FigureS5
+```
+```{r eval = FALSE}
+ggsave("./FigureS5.pdf", plot = Fig_supp.met, device = cairo_pdf,  
+  width = 17.3,
+  height = 18,
+  units = "cm")
+```
+## Regrouping mice by final C. minuta content corroborates treatment effects
+### Figure S6
+```{r}
+median_Cmin_per_gCC <- median(metadata_Cmin$qPCR_Cmin_SQ_per_gCC) 
+
+metadata_Cmin_HL <- metadata_Cmin %>% 
+  dplyr::mutate(Cmin_load = ifelse(qPCR_Cmin_SQ_per_gCC > median_Cmin_per_gCC, "High", "Low")) %>%
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels = c("Low", "High"))) 
+
+FigS6_high_Low <- metadata_Cmin_HL %>%
+  dplyr::mutate(Cmin_per_gCC_1e7 = qPCR_Cmin_SQ_per_gCC / 1e7) %>% 
+  ggplot(aes(x = Category, y = Cmin_per_gCC_1e7, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Category), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values=color_HL, label = c("Low-CM", "High-CM"),name = "Group") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = expression(paste("C. minuta (GE/g) x ", e^7))) +
+  theme(axis.text.x = element_text(face = "italic")) +
+  geom_hline(yintercept=(median_Cmin_per_gCC/ 1e7), linetype="dashed", color = "black") +
+  scale_x_discrete(labels=c("Killed" = "Killed\nCM", "Live" = "Live\nCM")) 
+FigS6_high_Low
+```
+```{r}
+set.seed(763)
+Promethion_Food_HL <- metadata_Cmin_HL %>%
+  dplyr::select(MouseID, Cmin_load)  %>%
+  dplyr::left_join(Promethion_Food) %>% 
+  tidyr::drop_na(Cmin_load, Promethion_weight_norm)
+
+Promethion_Food_HL$FI_kcal_day_norm <- predict(bestNormalize(Promethion_Food_HL$FI_kcal_day))
+
+options(contrasts=c("contr.sum", "contr.poly"))
+model_food_HL <- lmerTest::lmer(FI_kcal_day_norm ~ Cmin_load*Sex + Sex*Promethion_weight_norm +Promethion_Cabinet + (Cmin_load|Batch/Sex/Promethion_Cabinet), data = Promethion_Food_HL)
+lmerTest::step(model_food_HL, keep = "Cmin_load")
+```
+no effect of Cmin_load
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_food_HL.2 <- lm(FI_kcal_day_norm ~ Cmin_load+Sex + Promethion_weight_norm, data = Promethion_Food_HL)
+shapiro.test(residuals(model_food_HL.2))
+anova(lm(residuals(model_food_HL.2)~fitted.values(model_food_HL.2)))
+```
+```{r}
+car::Anova(model_food_HL.2, test.statistic ="F", type ="II")
+```
+```{r}
+model_food_HL.eff <- lm(FI_kcal_day ~ Cmin_load+Sex + Promethion_weight_norm, data = Promethion_Food_HL)
+effects::effect("Cmin_load", model_food_HL.eff, se = TRUE) %>% as.data.frame
+```
+```{r}
+model_food_HL_resid <- lm(FI_kcal_day_norm ~ Sex + Promethion_weight_norm, data = Promethion_Food_HL)
+
+Promethion_Food_HL$FI_kcal_day_resid_HL <- residuals(model_food_HL_resid)/sigma(model_food_HL_resid)
+
+FigS6_food <- Promethion_Food_HL %>% 
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = FI_kcal_day_resid_HL, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Cmin_load), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_HL) +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. food intake") +
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS6_food
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+set.seed(650)
+Promethion_Food_HL <- Promethion_Food_HL %>%
+  dplyr::mutate(Feed_eficiency_norm = predict(bestNormalize(Feed_eficiency)))
+
+model_feeding_eff_HL <- lmer(Feed_eficiency_norm ~ Sex*Cmin_load + Promethion_Cabinet + (1|Batch), data = Promethion_Food_HL)
+step(model_feeding_eff_HL)
+```
+```{r}
+model_feeding_eff_HL.2 <- lmer(Feed_eficiency_norm ~ Cmin_load + (1|Batch), data = Promethion_Food_HL)
+shapiro.test(residuals(model_feeding_eff_HL.2))
+anova(lm(residuals(model_feeding_eff_HL.2)~fitted.values(model_feeding_eff_HL.2)))
+```
+```{r}
+plot(model_feeding_eff_HL.2)
+```
+```{r}
+Anova(model_feeding_eff_HL.2, type ="II", test.statistic ="F")
+```
+```{r}
+model_feeding_eff_HL.eff <- lmer(Feed_eficiency ~ Cmin_load + (1|Batch), data = Promethion_Food_HL)
+effects::effect("Cmin_load", model_feeding_eff_HL.eff, se = TRUE) %>% as.data.frame
+```
+```{r}
+model_feeding_eff_HL.resid <- lmer(Feed_eficiency_norm ~ (1|Batch), data = Promethion_Food_HL)
+
+Promethion_Food_HL$Feed_efficency_resid_HL <- residuals(model_feeding_eff_HL.resid)/sigma(model_feeding_eff_HL.resid)
+
+FigS6_feed_eff <- Promethion_Food_HL %>%
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = Feed_efficency_resid_HL, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Cmin_load), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_HL) +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. feed efficiency") +
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS6_feed_eff
+```
+```{r}
+set.seed(628)
+metadata_bc_HL <- metadata_Cmin_HL %>%
+  dplyr::select(MouseID, Cmin_load)  %>%
+  dplyr::left_join(metadata_bc, by ="MouseID") %>% 
+  tidyr::drop_na(Cmin_load, bombcal_Calorific_Value_kcal_total_day)
+ 
+
+metadata_bc_HL <- metadata_bc_HL %>%
+  dplyr::mutate(bombcal_Calorific_Value_kcal_total_day_norm = predict(bestNormalize(bombcal_Calorific_Value_kcal_total_day)),
+                Promethion_weight_norm <- predict(bestNormalize(Promethion_weight)), 
+                bombcal_Dry_sample_mass_norm <- predict(bestNormalize(bombcal_Dry_sample_mass)))
+
+model_Bomb_cal_HL <- lmerTest::lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ Cmin_load*Sex + Promethion_weight_norm +(Cmin_load|Batch/Sex/Promethion_Cabinet), data = metadata_bc_HL)
+lmerTest::step(model_Bomb_cal_HL, keep = "Cmin_load")
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+
+model_Bomb_cal_HL.2 <- lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ Cmin_load + Promethion_weight_norm+ (1 | Promethion_Cabinet:(Sex:Batch)), data = metadata_bc_HL)
+stats::shapiro.test(residuals(model_Bomb_cal_HL.2))
+anova(lm(residuals(model_Bomb_cal_HL.2)~fitted.values(model_Bomb_cal_HL.2)))
+```
+```{r}
+plot(model_Bomb_cal_HL.2)
+```
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+car::Anova(model_Bomb_cal_HL.2, test.statistic="F", type = "II")
+```
+```{r}
+model_Bomb_cal_HL_eff <- lmer(bombcal_Calorific_Value_kcal_total_day ~ Cmin_load + Promethion_weight_norm+ (1 | Promethion_Cabinet:(Sex:Batch)), data = metadata_bc_HL)
+
+effect(c("Cmin_load"), model_Bomb_cal_HL_eff, se =TRUE) %>% as.data.frame
+```
+```{r}
+model_Bomb_cal_HL_resid <- lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ Sex + Promethion_weight_norm+ (1 | Promethion_Cabinet:(Sex:Batch)), data = metadata_bc_HL)
+
+metadata_bc_HL$bombcal_Calorific_Value_kcal_total_day_resid_HL <- residuals(model_Bomb_cal_HL_resid)/sigma(model_Bomb_cal_HL_resid)
+
+FigS6_bomb_cal <- metadata_bc_HL %>%
+  drop_na(Cmin_load) %>% 
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = bombcal_Calorific_Value_kcal_total_day_resid_HL, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Cmin_load), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_HL) +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. fecal energy content") +
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS6_bomb_cal
+```
+Beam Breaks
+```{r}
+set.seed(259)
+
+Promethion_activity_HL <- metadata_Cmin_HL %>%
+  dplyr::select(MouseID, Cmin_load)  %>%
+  dplyr::left_join(Promethion_activity, by ="MouseID") %>% 
+  tidyr::drop_na(Cmin_load, Beam_breaks)
+
+Promethion_activity_HL$Beam_breaks_norm <- predict(bestNormalize(Promethion_activity_HL$Beam_breaks))
+
+options(contrasts=c("contr.sum", "contr.poly"))
+
+model_bb_HL<-(lmer(Beam_breaks_norm ~ Cmin_load*Sex + Promethion_Cabinet + (Cmin_load|Batch), Promethion_activity_HL))
+step(model_bb_HL, keep ="Cmin_load")
+```
+
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+model_bb_HL.2<-(lmer(Beam_breaks_norm ~ Cmin_load + (1|Batch), Promethion_activity_HL))
+stats::shapiro.test(resid(model_bb_HL.2))
+anova(lm(residuals(model_bb_HL.2)~fitted.values(model_bb_HL.2)))
+```
+```{r}
+plot(model_bb_HL.2)
+```
+```{r}
+car::Anova(model_bb_HL.2, test.statistic ="F", type ="II")
+```
+```{r}
+model_bb_HL.eff<-(lmer(Beam_breaks ~ Cmin_load + (1|Batch), Promethion_activity_HL))
+effects::effect("Cmin_load", model_bb_HL.eff, se =TRUE) %>% as.data.frame()
+```
+```{r}
+model_bb_HL.resid<-(lmerTest::lmer(Beam_breaks_norm ~ (1 | Batch), Promethion_activity_HL))
+
+Promethion_activity_HL$BeamBreaks_HL_resid <- residuals(model_bb_HL.resid)/sigma(model_bb_HL.resid)
+
+FigS6_bb_HL <- Promethion_activity_HL %>%
+  drop_na(Cmin_load) %>% 
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = Beam_breaks_norm, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Cmin_load), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_HL) +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. beam breaks") +
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS6_bb_HL
+```
+Distance traveled
+```{r}
+set.seed(312) 
+Promethion_activity_HL$Distance_traveled_norm<- predict(bestNormalize(Promethion_activity_HL$Distance_traveled))
+
+model_distance_HL<-(lmer(Distance_traveled_norm ~ Cmin_load*Sex + Promethion_Cabinet + (Cmin_load|Batch), Promethion_activity_HL))
+lmerTest::step(model_distance_HL, keep = "Cmin_load")
+```
+```{r}
+model_distance_HL.2<-(lmer(Distance_traveled_norm ~ Cmin_load*Sex + (1|Batch), Promethion_activity_HL))
+shapiro.test(residuals(model_distance_HL.2))
+anova(lm(residuals(model_distance_HL.2)~fitted.values(model_distance_HL.2)))
+```
+```{r}
+car::Anova(model_distance_HL.2, type ="III", test.statistic ="F")
+```
+```{r}
+emmeans::joint_tests(model_distance_HL.2, by ="Sex")
+```
+```{r}
+model_distance_HL.eff<-(lmer(Distance_traveled ~ Cmin_load*Sex  + (1|Batch), Promethion_activity_HL))
+effects::effect("Cmin_load*Sex", model_distance_HL.eff, se =TRUE) %>% as.data.frame
+```
+```{r}
+model_distance_HL.resid <-(lmer(Distance_traveled_norm ~ Sex + (1|Batch), Promethion_activity_HL))
+
+Promethion_activity_HL$Distance_traveled_resid_HL <- residuals(model_distance_HL.resid)/sigma(model_distance_HL.resid)
+
+FigS6_distance_HL <- Promethion_activity_HL %>%
+  drop_na(Cmin_load) %>% 
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = Distance_traveled_resid_HL, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Cmin_load), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_HL) +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Adj. distance traveled") +
+  theme(axis.text.x = element_text(face = "italic"))  + 
+  facet_grid(.~Sex) 
+FigS6_distance_HL
+```
+```{r}
+FigS6_HL_legend <- cowplot::get_legend(metadata_Cmin_HL %>% 
+  dplyr::mutate(Sex = ifelse(Sex == "F", "Female", "Male"), Cmin_load = ifelse(Cmin_load == "Low", "Low-CM", "High-CM")) %>%
+  dplyr::mutate(Sex_Cmin_load = paste(Sex, Cmin_load, sep = " ")) %>%
+  ggplot() +
+  geom_point(aes(x = Sex_Cmin_load, y = qPCR_Cmin_per_gCC, shape = Sex_Cmin_load, color = Sex_Cmin_load), size =3 , alpha =1,
+             show.legend = T) +
+  scale_shape_manual(values=c(16, 16,4, 4)) + 
+  scale_color_manual(values= c(color_HL, color_HL)) +
+  theme_classic(base_size = 10) +
+  theme(legend.title = element_blank()))
+
+
+FigS6_align <- cowplot::align_plots(FigS6_high_Low + theme(legend.position="none"),
+                                            FigS6_food + theme(legend.position="none"),
+                                            FigS6_feed_eff + theme(legend.position="none"),
+                                            FigS6_bomb_cal + theme(legend.position="none"),
+                                          FigS6_bb_HL + theme(legend.position="none"),
+                                          FigS6_distance_HL + theme(legend.position="none"),
+                                            align = 'v', axis = 'l')
+
+FigS6_1 <- cowplot::plot_grid(FigS6_align[[1]],  
+                               FigS6_align[[2]], 
+                               FigS6_align[[3]], 
+                               FigS6_align[[4]], 
+                               ncol=4, nrow=1, labels = c("A", "B", "C", "D"), label_size = 12, rel_widths = c(1,1,1,1))
+FigS6_2 <- cowplot::plot_grid(NA,  
+                               FigS6_align[[5]], 
+                               NA, 
+                               FigS6_align[[6]], 
+                               FigS6_HL_legend,
+                               ncol=5, nrow=1, labels = c(NA, "E", NA, "F", NA), label_size = 12, rel_widths = c(0.3,1,0.3,1.8,0.8))
+FigureS6 <- cowplot::plot_grid(FigS6_1,  
+                               FigS6_2, 
+                               ncol=1, nrow=2, rel_heights = c(1,1))
+```
+```{r fig.width=6, fig.height= 4}
+FigureS6
+```
+```{r eval = FALSE}
+ggsave("./FigureS6.pdf", plot = FigureS6, device = cairo_pdf,  
+  width = 15.5,
+  height = 10.5,
+  units = "cm")
+```
+
+### FigureS7
+```{r}
+set.seed(759)
+
+metadata_Cmin_HL_qPCR <- metadata_Cmin_HL %>%
+  tidyr::drop_na(Cmin_load, qPCR_16S_SQ_per_gCC) %>%
+  dplyr::mutate(qPCR_16S_SQ_per_gCC_norm = predict(bestNormalize(qPCR_16S_SQ_per_gCC)))
+
+model_qPCR16S_HL<- lmerTest::lmer(qPCR_16S_SQ_per_gCC_norm ~ Cmin_load*Sex + T6_weight + Plate + (1|qPCR_Round/Batch/Sex), data = metadata_Cmin_HL_qPCR)
+lmerTest::step(model_qPCR16S_HL, keep = "Cmin_load")
+```
+```{r}
+model_qPCR16S_HL.2<- lmer(qPCR_16S_SQ_per_gCC_norm ~ Cmin_load + Plate + (1 | Batch:qPCR_Round), data = metadata_Cmin_HL_qPCR)
+
+shapiro.test(residuals(model_qPCR16S_HL.2))
+anova(lm(residuals(model_qPCR16S_HL.2) ~ fitted(model_qPCR16S_HL.2))) 
+```
+```{r}
+plot(model_qPCR16S_HL.2)
+```
+```{r}
+car::Anova(model_qPCR16S_HL.2, type = "II", test.statistic ="F")
+```
+```{r}
+model_qPCR16S_HL.eff<- lmer(qPCR_16S_SQ_per_gCC~ Cmin_load + Plate + (1 | Batch:qPCR_Round), data = metadata_Cmin_HL_qPCR)
+effects::effect("Cmin_load", model_qPCR16S_HL.eff, se =TRUE) %>% as.data.frame
+```
+```{r}
+FigS7_mbiomass_HL <- metadata_Cmin_HL_qPCR %>%
+  drop_na(Cmin_load) %>% 
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  dplyr::mutate(qPCR_16S_SQ_per_gCC_e10 = qPCR_16S_SQ_per_gCC/1e10) %>% 
+  ggplot(aes(x = Cmin_load, y = qPCR_16S_SQ_per_gCC_e10, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Cmin_load), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_HL, label = c("Low-CM", "High-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = expression(paste("Microbes (GE/g) x ", e^10))) +
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS7_mbiomass_HL
+```
+bombcal ~ microbial biomass/cmin
+```{r}
+options(contrasts=c("contr.sum", "contr.poly"))
+set.seed(259)
+metadata_Cmin_HL_qPCR_bc <- metadata_Cmin_HL_qPCR %>%
+  dplyr::select(MouseID, qPCR_16S_SQ_per_gCC, qPCR_Cmin_SQ_per_gCC, qPCR_Round) %>%
+  dplyr::left_join(metadata_bc_HL, by ="MouseID") %>%
+  tidyr::drop_na(bombcal_Calorific_Value_kcal_total_day) %>%
+  dplyr::mutate(qPCR_16S_SQ_per_gCC_norm = predict(bestNormalize(qPCR_16S_SQ_per_gCC)), 
+                qPCR_Cmin_SQ_per_gCC_norm = predict(bestNormalize(qPCR_Cmin_SQ_per_gCC)), 
+                bombcal_Calorific_Value_kcal_total_day_norm = predict(bestNormalize(bombcal_Calorific_Value_kcal_total_day)), 
+                Promethion_weight_norm = predict(bestNormalize(Promethion_weight)))
+
+model_bombcal_Cmin <- lmerTest::lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ qPCR_Cmin_SQ_per_gCC_norm*Sex + qPCR_Round + Promethion_weight_norm +(1|Batch/Sex/Promethion_Cabinet), data = metadata_Cmin_HL_qPCR_bc)
+lmerTest::step(model_bombcal_Cmin)
+
+model_bombcal_biomass <- lmerTest::lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ qPCR_16S_SQ_per_gCC_norm*Sex + qPCR_Round + Promethion_weight_norm +(1|Batch/Sex/Promethion_Cabinet), data = metadata_Cmin_HL_qPCR_bc)
+lmerTest::step(model_bombcal_biomass)
+```
+```{r}
+model_bombcal_Cmin.2 <- lmerTest::lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ qPCR_Cmin_SQ_per_gCC_norm + Promethion_weight_norm + (1 | Promethion_Cabinet:(Sex:Batch)), data = metadata_Cmin_HL_qPCR_bc)
+model_bombcal_biomass.2 <- lmerTest::lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ qPCR_16S_SQ_per_gCC_norm + Promethion_weight_norm + (1 | Promethion_Cabinet:(Sex:Batch)), data = metadata_Cmin_HL_qPCR_bc)
+
+shapiro.test(residuals(model_bombcal_Cmin.2))
+shapiro.test(residuals(model_bombcal_biomass.2))
+
+anova(lm(residuals(model_bombcal_Cmin.2)~fitted.values(model_bombcal_Cmin.2)))
+anova(lm(residuals(model_bombcal_biomass.2)~fitted.values(model_bombcal_biomass.2)))
+
+car::Anova(model_bombcal_Cmin.2, test.statistic ="F", type ="II")
+car::Anova(model_bombcal_biomass.2, test.statistic ="F", type ="II")
+
+
+r2_model_bombcal_Cmin_mar<- partR2(model_bombcal_Cmin.2, partvars = c("qPCR_Cmin_SQ_per_gCC_norm"), 
+                  R2_type = "marginal", nboot = 10)
+r2_model_bombcal_Cmin_mar$R2 %>% dplyr::filter(term == "qPCR_Cmin_SQ_per_gCC_norm") %>% dplyr::select(estimate) %>% pull()
+
+
+r2_model_bombcal_biomass_mar<- partR2(model_bombcal_biomass.2, partvars = c("qPCR_16S_SQ_per_gCC_norm"), 
+                  R2_type = "marginal", nboot = 10)
+r2_model_bombcal_biomass_mar$R2 %>% dplyr::filter(term == "qPCR_16S_SQ_per_gCC_norm") %>% dplyr::select(estimate) %>% pull()
+```
+```{r}
+model_bombcal_HL_resid <- lmer(bombcal_Calorific_Value_kcal_total_day_norm ~ Sex + Promethion_weight_norm+ (1 | Promethion_Cabinet:(Sex:Batch)), data = metadata_Cmin_HL_qPCR_bc)
+metadata_Cmin_HL_qPCR_bc$bombcal_Calorific_Value_kcal_total_day_resid <- residuals(model_bombcal_HL_resid)/sigma(model_bombcal_HL_resid)
+
+FigS7_biomass_bc<- metadata_Cmin_HL_qPCR_bc %>%
+  ggplot(aes(x= qPCR_16S_SQ_per_gCC_norm ,y=bombcal_Calorific_Value_kcal_total_day_resid)) +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color ="black")+ 
+  geom_point(aes(color = Cmin_load, shape = Sex), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_HL, label = c(expression(italic("Low-CM")), expression(italic("High-CM"))), name = "Group") +
+  theme_classic(base_size = 10) +
+  labs(x = "Norm. microbes", y = "Adj. fecal energy\ncontent") 
+FigS7_biomass_bc
+
+FigS7_cmin_bc<- metadata_Cmin_HL_qPCR_bc %>%
+  ggplot(aes(x= qPCR_Cmin_SQ_per_gCC_norm ,y=bombcal_Calorific_Value_kcal_total_day_resid)) +
+  geom_smooth(method = "lm", se = F,  alpha = 0.8, size = 0.5, color ="black")+ 
+  geom_point(aes(color = Cmin_load, shape = Sex), alpha =0.7, size =0.75, show.legend = T) +
+  scale_shape_manual(values=shape_Sex, label = c("Female", "Male"),name = "Sex") + 
+  scale_color_manual(values=color_HL, label = c(expression(italic("Low-CM")), expression(italic("High-CM"))), name = "Group") +
+  theme_classic(base_size = 10) +
+  labs(x = "Norm. C. minuta", y = "Adj. fecal energy\ncontent")
+FigS7_cmin_bc
+```
+alpha hL
+```{r}
+Alpha_div_HL <- metadata_Cmin_HL %>%
+  dplyr::select(MouseID, Cmin_load)  %>%
+  dplyr::left_join(Alpha_div, by ="MouseID") %>% 
+  tidyr::drop_na(Cmin_load, shannon_entropy)
+
+Alpha_div_HL_M <- Alpha_div_HL %>% 
+  filter(Sex =="M")
+Alpha_div_HL_F <- Alpha_div_HL %>% 
+  filter(Sex =="F")
+
+wilcox.test(shannon_entropy~Cmin_load, data = Alpha_div_HL_M, exact = FALSE, correct = FALSE, conf.int = FALSE)
+wilcox.test(shannon_entropy~Cmin_load, data = Alpha_div_HL_F, exact = FALSE, correct = FALSE, conf.int = FALSE)
+
+wilcox.test(pielou_evenness~Cmin_load, data = Alpha_div_HL_M, exact = FALSE, correct = FALSE, conf.int = FALSE)
+wilcox.test(pielou_evenness~Cmin_load, data = Alpha_div_HL_F, exact = FALSE, correct = FALSE, conf.int = FALSE)
+
+wilcox.test(faith_pd~Cmin_load, data = Alpha_div_HL_M, exact = FALSE, correct = FALSE, conf.int = FALSE)
+wilcox.test(faith_pd~Cmin_load, data = Alpha_div_HL_F, exact = FALSE, correct = FALSE, conf.int = FALSE)
+
+wilcox.test(observed_features~Cmin_load, data = Alpha_div_HL_M, exact = FALSE, correct = FALSE, conf.int = FALSE)
+wilcox.test(observed_features~Cmin_load, data = Alpha_div_HL_F, exact = FALSE, correct = FALSE, conf.int = FALSE)
+```
+--> sex-dimorphic effects gone! 
+--> analyses by group not separated by sex anymore! 
+```{r}
+wilcox.test(shannon_entropy~Cmin_load, data = Alpha_div_HL, exact = FALSE, correct = FALSE, conf.int = FALSE)
+wilcox.test(pielou_evenness~Cmin_load, data = Alpha_div_HL, exact = FALSE, correct = FALSE, conf.int = FALSE)
+wilcox.test(faith_pd~Cmin_load, data = Alpha_div_HL, exact = FALSE, correct = FALSE, conf.int = FALSE)
+wilcox.test(observed_features~Cmin_load, data = Alpha_div_HL, exact = FALSE, correct = FALSE, conf.int = FALSE)
+```
+
+```{r}
+mean_se_HL <- Alpha_div_HL %>%
+  dplyr::group_by(Cmin_load) %>%
+  dplyr::summarise(mean = mean(shannon_entropy), se = standard_error(shannon_entropy))%>%
+  dplyr::mutate(alpha = "se")
+
+mean_pe_HL <- Alpha_div_HL %>%
+  dplyr::group_by(Cmin_load) %>%
+  dplyr::summarise(mean = mean(pielou_evenness), se = standard_error(pielou_evenness))%>%
+  dplyr::mutate(alpha = "pe")
+
+mean_fdp_HL <- Alpha_div_HL %>%
+  dplyr::group_by(Cmin_load) %>%
+  dplyr::summarise(mean = mean(faith_pd), se = standard_error(faith_pd))%>%
+  dplyr::mutate(alpha = "fdp")
+
+mean_of_HL <- Alpha_div_HL %>%
+  dplyr::group_by(Cmin_load) %>%
+  dplyr::summarise(mean = mean(observed_features), se = standard_error(observed_features))%>%
+  dplyr::mutate(alpha = "of")
+
+rbind(mean_se_HL, mean_pe_HL, mean_fdp_HL, mean_of_HL)
+```
+```{r}
+FigS7_alpha_HL_MR <- Alpha_div_HL %>% 
+  drop_na(Cmin_load) %>% 
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = observed_features, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Cmin_load), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_HL, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "# microbial species") +
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS7_alpha_HL_MR
+
+FigS7_alpha_HL_SE <- Alpha_div_HL %>% 
+  drop_na(Cmin_load) %>% 
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = shannon_entropy, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Cmin_load), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_HL, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Shannon Entropy")+
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS7_alpha_HL_SE
+
+FigS7_alpha_HL_FPD <- Alpha_div_HL %>% 
+  drop_na(Cmin_load) %>% 
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = faith_pd, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Cmin_load), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_HL, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Faith's PD")+
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS7_alpha_HL_FPD
+
+FigS7_alpha_HL_PE <- Alpha_div_HL %>% 
+  drop_na(Cmin_load) %>% 
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = pielou_evenness, shape = Sex, color = Cmin_load)) + 
+  geom_quasirandom(alpha = 0.7, size = 0.75) +
+  stat_summary(fun = mean, geom = "point", size=2, aes(group = Cmin_load), color = "black", alpha = 0.6, shape = 15) +
+  scale_color_manual(values = color_HL, label = c("Killed-CM", "Live-CM"), name = "Treatment") +
+  scale_shape_manual(values = shape_Sex, label = c("Female", "Male")) +
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  theme_classic(base_size = 10) +
+  theme(axis.title.x=element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(y = "Pilou evenness")+
+  theme(axis.text.x = element_text(face = "italic")) 
+FigS7_alpha_HL_PE
+```
+beta diversity
+```{r}
+reads_rare_norm_metadata <- reads_rare_norm_metadata[ order(row.names(reads_rare_norm_metadata)), ] 
+
+metadata_Cmin_load <- metadata_Cmin_HL %>%
+  dplyr::select(MouseID, Cmin_load)
+
+reads_rare_norm_metadata.melt_HL <- reads_rare_norm_metadata %>% 
+  tibble::rownames_to_column(var = "sampleid")  %>%
+  dplyr::left_join(metadata_Cmin_load, by ="MouseID") %>%
+  dplyr::select(sampleid, Sex, Cmin_load) %>%
+  dplyr::mutate_if(is.factor,as.character)
+
+wUF_melt_HL <- melt(as.matrix(Beta_wUF.2)) %>%
+    filter(as.character(Var1) != as.character(Var2)) %>%
+    mutate_if(is.factor,as.character)
+
+uwUF_melt_HL <- melt(as.matrix(Beta_uwUF.2)) %>%
+    filter(as.character(Var1) != as.character(Var2)) %>%
+    mutate_if(is.factor,as.character)
+
+colnames(reads_rare_norm_metadata.melt_HL) = c("Var1", "Sex1", "Cmin_load1")
+wUF_melt_HL = left_join(wUF_melt_HL, reads_rare_norm_metadata.melt_HL, by = "Var1")
+uwUF_melt_HL = left_join(uwUF_melt_HL, reads_rare_norm_metadata.melt_HL, by = "Var1")
+
+colnames(reads_rare_norm_metadata.melt_HL) = c("Var2", "Sex2", "Cmin_load2")
+wUF_melt_HL = left_join(wUF_melt_HL, reads_rare_norm_metadata.melt_HL, by = "Var2")
+uwUF_melt_HL = left_join(uwUF_melt_HL, reads_rare_norm_metadata.melt_HL, by = "Var2")
+```
+```{r}
+set.seed(765)
+
+wUF_melt.HL <- wUF_melt_HL %>%
+  dplyr::filter(Cmin_load1 == Cmin_load2, Sex1 == Sex2) %>%
+  dplyr::mutate(Cmin_load = Cmin_load1, Sex = Sex1)
+
+wilcox.test(value ~ Cmin_load, data = wUF_melt.HL, exact = FALSE, correct = FALSE)
+
+
+uwUF_melt.HL <- uwUF_melt_HL %>%
+  dplyr::filter(Cmin_load1 == Cmin_load2, Sex1 == Sex2) %>%
+  dplyr::mutate(Cmin_load = Cmin_load1, Sex = Sex1) 
+
+wilcox.test(value ~ Cmin_load, data = uwUF_melt.HL, exact = FALSE, correct = FALSE) 
+```
+```{r}
+FigS7_wUF <- wUF_melt.HL %>%
+  drop_na(Cmin_load) %>%
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = value, fill=factor(Cmin_load))) +
+  theme_classic(base_size = 10) +
+  geom_boxplot(alpha =0.7, outlier.size = 0.3, outlier.alpha = 0.5) +
+  scale_fill_manual(values=color_HL)+
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  labs(y = "weighted\nUniFrac distances")  +
+  theme(axis.text.x = element_text(face = "italic"), axis.title.x=element_blank()) 
+FigS7_wUF
+
+FigS7_uwUF <-uwUF_melt.HL %>%
+  drop_na(Cmin_load) %>%
+  dplyr::mutate(Cmin_load = factor(Cmin_load, levels= c("Low", "High"))) %>% 
+  ggplot(aes(x = Cmin_load, y = value, fill=factor(Cmin_load))) +
+  theme_classic(base_size = 10) +
+  geom_boxplot(alpha =0.7, outlier.size = 0.3, outlier.alpha = 0.5) +
+  scale_fill_manual(values=color_HL)+
+  scale_x_discrete(labels=c("Low" = "Low\nCM", "High" = "High\nCM")) +
+  labs(y = "unweighted\nUniFrac distances")  +
+  theme(axis.text.x = element_text(face = "italic"), axis.title.x=element_blank())
+FigS7_uwUF
+```
+```{r}
+FigS7_HL_legend <- cowplot::get_legend(metadata_Cmin_HL %>% 
+  dplyr::mutate(Sex = ifelse(Sex == "F", "Female", "Male"), Cmin_load = ifelse(Cmin_load == "Low", "Low-CM", "High-CM")) %>%
+  dplyr::mutate(Sex_Cmin_load = paste(Sex, Cmin_load, sep = " ")) %>%
+  ggplot() +
+  geom_point(aes(x = Sex_Cmin_load, y = qPCR_Cmin_per_gCC, shape = Sex_Cmin_load, color = Sex_Cmin_load), size =3 , alpha =1,
+             show.legend = T) +
+  scale_shape_manual(values=c(16, 16,4, 4)) + 
+  scale_color_manual(values= c(color_HL, color_HL)) +
+  theme_classic(base_size = 10) +
+  theme(legend.title = element_blank()) + 
+  theme(legend.position = "bottom"))
+
+FigS7_align <- cowplot::align_plots(FigS7_mbiomass_HL + theme(legend.position="none"),
+                                            FigS7_biomass_bc + theme(legend.position="none"),
+                                            FigS7_cmin_bc + theme(legend.position="none"),
+                                            FigS7_alpha_HL_MR + theme(legend.position="none"),
+                                            FigS7_alpha_HL_SE + theme(legend.position="none"),
+                                            FigS7_alpha_HL_FPD + theme(legend.position="none"),
+                                            FigS7_alpha_HL_PE + theme(legend.position="none"),
+                                            FigS7_wUF + theme(legend.position="none"),
+                                            FigS7_uwUF + theme(legend.position="none"),
+                                            align = 'hv', axis = 'tblr')
+
+FigS7_1 <- cowplot::plot_grid(FigS7_align[[1]],
+                                       FigS7_align[[2]], 
+                                       FigS7_align[[3]], 
+                                       FigS7_align[[4]],
+                                       FigS7_align[[6]],
+                                       FigS7_align[[5]],
+                                       FigS7_align[[7]],
+                                       FigS7_align[[8]],
+                                       FigS7_align[[9]],
+                                       ncol=3, nrow=3, labels = c("A", "B", "C", "D", "E", "F", "G", "H", "I"), label_size = 12, rel_widths = c(1,1, 1))
+
+FigureS7 <- cowplot::plot_grid(FigS7_1,
+                                       FigS7_HL_legend,
+                                       ncol=1, nrow=2,  rel_heights = c(3, 0.05))
+```
+```{r fig.width=6.5, fig.height= 5.5}
+FigureS7
+```
+```{r eval = FALSE}
+ggsave("./FigureS7.pdf", plot = FigureS7, device = cairo_pdf,  
+  width = 16.5,
+  height = 14,
+  units = "cm")
+```
+
+```{r}
+sessionInfo()
+```

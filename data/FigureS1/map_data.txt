@@ -1,0 +1,53 @@
+Study	Country	Reference	Sample_size_of_cohort	City	Lat	Long	Association
+1	USA	(Turnbaugh et al. 2009) 	154	USA: UCSF	37.7749	-122.4194	BMI
+2	Mexico	(López-Contreras et al. 2018)	138	Mexico	23.6345	-102.5528	BMI
+3	USA	"(Dhakal, McCormack, and Dey 2020)"	36	"Brookings County, South Dakota"	44.4212	-96.8351	BMI
+4	US/UK (AGP)	(Vujkovic-Cvijin et al. 2020)	5878	USA: South Dakota State	44.3219	-96.6837	BMI
+5	USA	(Brooks et al. 2018)	1673	USA: Vanderbilt	36.1627	-86.7816	BMI
+6	USA	(McCann et al. 2020)	54	"Durham, North Carolina"	35.9940	-78.8986	BMI
+7.1	USA	(Peters et al. 2018)	176	New York City	40.7128	-73.9352	BMI
+7.2	USA	(Peters et al. 2018)	423	Minneapolis 	44.9867	-93.2581	BMI
+8	UK	(Goodrich et al. 2014)	977	UK	51.4543	-0.1278	BMI
+9	Spain	(Cuevas-Sierra et al. 2020)	360	Pamplona	42.8125	1.6458	BMI
+10	Spain	(Ferrer et al. 2013)	39	Spain	40.4637	3.7492	BMI
+11	Netherlands	(Fu et al. 2015)	893	Netherlands	52.1326	5.0000	BMI
+12.1	UK	(Jackson et al. 2018)	2764	UK	51.5099	-0.1181	BMI
+12.2	UK	(Jackson et al. 2018)	639	Israel	31.7720	35.2170	BMI
+12.3	UK	(Jackson et al. 2018)	1023	Netherlands	52.3702	4.8952	BMI
+13	Spain	(Nogacka et al. 2020)	18	Asturias	43.3614	5.8593	BMI
+14	Norway	(Stanislawski et al. 2017)	169	Norway	60.4720	8.4689	BMI
+15	Norway	(Kummen et al. 2016)	384	Oslo	59.9139	10.7522	BMI
+16	China	(Xue Li et al. 2021)	194	Zhengzhou	34.7466	113.6253	BMI
+17	China	(Xiang Li et al. 2020)	4781	Guangdong province	23.3790	113.7633	BMI
+18	Korea	(Yun et al. 2017)	1274	Seoul	37.5665	126.9780	BMI
+19	Korea	(Lim et al. 2016)	655	S. Korea	35.9078	127.7669	BMI
+20	Japan	(Ikeda et al. 2020)	28	Fukuoka	33.5902	130.4017	BMI
+21	Japan	(Oki et al. 2016)	516	Japan	36.2048	138.2529	BMI
+22.1	China	(Gong et al. 2022)	125	"USA, Canada"	43.6511	-79.3470	BMI
+22.2	China	(Gong et al. 2022)	912	India	21.0893	79.0899	BMI
+22.3	China	(Gong et al. 2022)	164	Colombia	4.6243	-74.0636	BMI
+22.4	China	(Gong et al. 2022)	132	UK	51.4543	-0.1278	BMI
+22.5	China	(Gong et al. 2022)	50	"Mexico, Mexico City"	19.4511	-99.125519	BMI
+22.6	China	(Gong et al. 2022)	2676	"USA, UK"	51.5099	-0.1181	BMI
+22.7	China	(Gong et al. 2022)	74	"China, Jinan"	36.6667	116.9833	BMI
+22.8	China	(Gong et al. 2022)	149	China	39.9167	116.3833	BMI
+23	Poland	(Stefura et al. 2021)	96	Kraków	50.0497	19.9445	BMI
+24	Denmark	(Allin et al. 2018)	268	NA	55.6761	12.5683	Health
+25	Denmark	(Castro-Mejía et al. 2020)	207	NA	55.6861	12.5783	Health
+26	China	(Yuan et al. 2020)	86	NA	26.4837	117.9249	Health
+27	Korea	(Kim et al. 2020)	747	NA	37.5665	126.978	Health
+28	Spain	(Calderón-Pérez et al. 2020)	61	NA	41.6176	0.62	Health
+29	Egypt	(Radwan et al. 2020)	25	NA	30.0444	31.2357	Health
+30	Germany	(Reitmeier et al. 2020)	1976	NA	48.4029	11.7412	Health
+31	Brazil	(Sparvoli et al. 2020)	97	NA	-23.5505	-46.6333	Health
+32	China	(Gao et al. 2020)	50	NA	31.299	120.5853	Health
+33	Italy	(Cancello et al. 2019)	20	NA	45.4642	9.19	Health
+34	USA	(Alemán et al. 2018)	10	NA	40.7138	-74.005	Health
+35	Finland	(Org et al. 2017)	531	NA	61.9241	25.7482	Health
+36	Colombia	(Guzman-Castaneda et al. 2018)	440	NA	6.2476	-75.5658	Health
+37	China	(He et al. 2018)	6896	NA	23.1291	113.2644	Health
+38	Spain	(Alcazar et al. 2022)	315	Tarragona	41.115696	1.249594	Health
+39	Germany	(Sowah et al. 2022)	150	Heidelberg	49.39875	8.672434	Health
+40	Italy	(Tavella et al. 2021)	201	Bologna (Emilia-Romagna region)	44.498955	12.568333	Health
+41	Netherlands	(Chen et al. 2021)	2166	Rotterdam	51.926517	4.462456	Health
+42	Spain	(Villaseñor-Aranguren et al. 2022)	60	Navarra	42.816666	-1.65	Health

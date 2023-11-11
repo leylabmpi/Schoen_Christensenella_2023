@@ -1,0 +1,62 @@
+2023-11-05 20:49:39 INFO::Writing function arguments to log file
+2023-11-05 20:49:39 DEBUG::Function arguments
+2023-11-05 20:49:39 DEBUG::Output folder: ./data/Interim_output/Maaslin_LCMS_F
+2023-11-05 20:49:39 DEBUG::Min Abundance: 0.000000
+2023-11-05 20:49:39 DEBUG::Min Prevalence: 0.700000
+2023-11-05 20:49:39 DEBUG::Normalization: TSS
+2023-11-05 20:49:39 DEBUG::Transform: LOG
+2023-11-05 20:49:39 DEBUG::Analysis method: LM
+2023-11-05 20:49:39 DEBUG::Max significance: 0.150000
+2023-11-05 20:49:39 DEBUG::Random effects: Batch
+2023-11-05 20:49:39 DEBUG::Fixed effects: Category,Metabolomics_Run
+2023-11-05 20:49:39 DEBUG::Correction method: BH
+2023-11-05 20:49:39 DEBUG::Standardize: TRUE
+2023-11-05 20:49:39 DEBUG::Cores: 1
+2023-11-05 20:49:39 INFO::Verifying options selected are valid
+2023-11-05 20:49:39 INFO::Determining format of input files
+2023-11-05 20:49:39 INFO::Input format is data samples as rows and metadata samples as rows
+2023-11-05 20:49:39 DEBUG::A total of 45 samples were found in both the data and metadata
+2023-11-05 20:49:39 DEBUG::Reordering data/metadata to use same sample ordering
+2023-11-05 20:49:39 INFO::Formula for random effects: expr ~ (1 | Batch)
+2023-11-05 20:49:39 INFO::Formula for fixed effects: expr ~  Category + Metabolomics_Run
+2023-11-05 20:49:39 INFO::Filter data based on min abundance and min prevalence
+2023-11-05 20:49:39 INFO::Total samples in data: 45
+2023-11-05 20:49:39 INFO::Min samples required with min abundance for a feature not to be filtered: 31.500000
+2023-11-05 20:49:39 INFO::Total filtered features: 0
+2023-11-05 20:49:39 INFO::Filtered feature names from abundance and prevalence filtering:
+2023-11-05 20:49:39 INFO::Total filtered features with variance filtering: 0
+2023-11-05 20:49:39 INFO::Filtered feature names from variance filtering:
+2023-11-05 20:49:39 INFO::Running selected normalization method: TSS
+2023-11-05 20:49:39 INFO::Applying z-score to standardize continuous metadata
+2023-11-05 20:49:40 INFO::Running selected transform method: LOG
+2023-11-05 20:49:40 INFO::Running selected analysis method: LM
+2023-11-05 20:49:40 INFO::Fitting model to feature number 1, Corticosterone
+2023-11-05 20:49:40 INFO::Fitting model to feature number 2, Glutamic_acid
+2023-11-05 20:49:40 INFO::Fitting model to feature number 3, Glutamine
+2023-11-05 20:49:40 INFO::Fitting model to feature number 4, Histamine
+2023-11-05 20:49:40 INFO::Fitting model to feature number 5, Indolelactic_acid
+2023-11-05 20:49:40 INFO::Fitting model to feature number 6, Kynurenic_acid
+2023-11-05 20:49:41 INFO::Fitting model to feature number 7, Kynurenine
+2023-11-05 20:49:41 INFO::Fitting model to feature number 8, Serotonin
+2023-11-05 20:49:44 INFO::Fitting model to feature number 9, Thyroxine
+2023-11-05 20:49:44 INFO::Fitting model to feature number 10, Tryptophan
+2023-11-05 20:49:44 INFO::Fitting model to feature number 11, GABA
+2023-11-05 20:49:44 INFO::Counting total values for each feature
+2023-11-05 20:49:44 INFO::Writing filtered data to file ./data/Interim_output/Maaslin_LCMS_F/features/filtered_data.tsv
+2023-11-05 20:49:44 INFO::Writing filtered, normalized data to file ./data/Interim_output/Maaslin_LCMS_F/features/filtered_data_norm.tsv
+2023-11-05 20:49:44 INFO::Writing filtered, normalized, transformed data to file ./data/Interim_output/Maaslin_LCMS_F/features/filtered_data_norm_transformed.tsv
+2023-11-05 20:49:44 INFO::Writing residuals to file ./data/Interim_output/Maaslin_LCMS_F/fits/residuals.rds
+2023-11-05 20:49:44 INFO::Writing fitted values to file ./data/Interim_output/Maaslin_LCMS_F/fits/fitted.rds
+2023-11-05 20:49:44 INFO::Writing extracted random effects to file ./data/Interim_output/Maaslin_LCMS_F/fits/ranef.rds
+2023-11-05 20:49:44 INFO::Writing all results to file (ordered by increasing q-values): ./data/Interim_output/Maaslin_LCMS_F/all_results.tsv
+2023-11-05 20:49:44 INFO::Writing the significant results (those which are less than or equal to the threshold of 0.150000 ) to file (ordered by increasing q-values): ./data/Interim_output/Maaslin_LCMS_F/significant_results.tsv
+2023-11-05 20:49:44 INFO::Writing heatmap of significant results to file: ./data/Interim_output/Maaslin_LCMS_F/heatmap.pdf
+2023-11-05 20:49:45 INFO::Writing association plots (one for each significant association) to output folder: ./data/Interim_output/Maaslin_LCMS_F
+2023-11-05 20:49:45 INFO::Plotting associations from most to least significant, grouped by metadata
+2023-11-05 20:49:45 INFO::Plotting data for metadata number 1, Metabolomics_Run
+2023-11-05 20:49:45 INFO::Creating boxplot for categorical data, Metabolomics_Run vs GABA
+2023-11-05 20:49:45 INFO::Creating boxplot for categorical data, Metabolomics_Run vs Thyroxine
+2023-11-05 20:49:45 INFO::Creating boxplot for categorical data, Metabolomics_Run vs Glutamine
+2023-11-05 20:49:45 INFO::Creating boxplot for categorical data, Metabolomics_Run vs Kynurenic_acid
+2023-11-05 20:49:46 INFO::Plotting data for metadata number 2, Category
+2023-11-05 20:49:46 INFO::Creating boxplot for categorical data, Category vs Corticosterone
